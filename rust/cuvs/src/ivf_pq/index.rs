@@ -18,6 +18,7 @@ use std::io::{stderr, Write};
 
 use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
+use crate::filters::{Filter, NoFilter};
 use crate::ivf_pq::{IndexParams, SearchParams};
 use crate::resources::Resources;
 
@@ -69,6 +70,7 @@ impl Index {
     /// * `queries` - A matrix in device memory to query for
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
+    /// * `filter` - Optional filter to apply to the search (defaults to NoFilter if not provided)
     pub fn search(
         self,
         res: &Resources,
@@ -76,8 +78,13 @@ impl Index {
         queries: &ManagedTensor,
         neighbors: &ManagedTensor,
         distances: &ManagedTensor,
+        filter: Option<&dyn Filter>,
     ) -> Result<()> {
         unsafe {
+            let filter_ffi = filter
+                .map(|f| f.into_ffi())
+                .unwrap_or_else(|| NoFilter.into_ffi());
+
             check_cuvs(ffi::cuvsIvfPqSearch(
                 res.0,
                 params.0,
@@ -85,6 +92,7 @@ impl Index {
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
+                filter_ffi,
             ))
         }
     }
