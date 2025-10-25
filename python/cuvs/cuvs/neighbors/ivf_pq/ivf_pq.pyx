@@ -46,6 +46,7 @@ from libc.stdint cimport (
 )
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors.filters import no_filter
 
 
 cdef class IndexParams:
@@ -454,6 +455,7 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
+           filter=None,
            resources=None):
     """
     Find the k nearest neighbors for each query.
@@ -474,6 +476,7 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    filter : Optional cuvs.neighbors.filters.Filter for prefiltering
     {resources_docstring}
 
     Examples
@@ -532,6 +535,9 @@ def search(SearchParams search_params,
         cydlpack.dlpack_c(distances_cai)
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
+    if filter is None:
+        filter = no_filter()
+
     with cuda_interruptible():
         check_cuvs(cuvsIvfPqSearch(
             res,
@@ -539,7 +545,8 @@ def search(SearchParams search_params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            filter.prefilter
         ))
 
     return (distances, neighbors)
