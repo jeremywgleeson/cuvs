@@ -95,7 +95,11 @@ void run_ivf_pq(int64_t n_rows,
   cuvsIvfPqSearchParams_t search_params;
   cuvsIvfPqSearchParamsCreate(&search_params);
   search_params->n_probes = n_probes;
-  cuvsIvfPqSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsFilter filter;
+  filter.addr = 0;
+  filter.type = NO_FILTER;
+  cuvsIvfPqSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // de-allocate index and res
   cuvsIvfPqSearchParamsDestroy(search_params);

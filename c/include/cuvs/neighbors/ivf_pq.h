@@ -396,13 +396,15 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter filter to apply to the search
  */
 cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                             cuvsIvfPqSearchParams_t search_params,
                             cuvsIvfPqIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 /**
  * @}
  */
