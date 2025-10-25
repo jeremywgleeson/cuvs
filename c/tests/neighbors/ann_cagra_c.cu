@@ -47,16 +47,16 @@ float queries[4][2] = {{0.48216683, 0.0428398},
                        {0.51260436, 0.2643005},
                        {0.05198065, 0.5789965}};
 
-uint32_t filter[1] = {0b1001};  // index 1 and 2 are removed
+uint32_t filter[1] = {0b1001}; // index 1 and 2 are removed
 
 uint32_t neighbors_exp[4] = {3, 0, 3, 1};
-float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
+float distances_exp[4] = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
 
 uint32_t neighbors_exp_filtered[4] = {3, 0, 3, 0};
-float distances_exp_filtered[4]    = {0.03878258, 0.12472608, 0.04776672, 0.59063464};
+float distances_exp_filtered[4] = {0.03878258, 0.12472608, 0.04776672,
+                                   0.59063464};
 
-TEST(CagraC, BuildSearch)
-{
+TEST(CagraC, BuildSearch) {
   // create cuvsResources_t
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
@@ -65,15 +65,15 @@ TEST(CagraC, BuildSearch)
 
   // create dataset DLTensor
   DLManagedTensor dataset_tensor;
-  dataset_tensor.dl_tensor.data               = dataset;
+  dataset_tensor.dl_tensor.data = dataset;
   dataset_tensor.dl_tensor.device.device_type = kDLCPU;
-  dataset_tensor.dl_tensor.ndim               = 2;
-  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
-  dataset_tensor.dl_tensor.dtype.bits         = 32;
-  dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t dataset_shape[2]                    = {4, 2};
-  dataset_tensor.dl_tensor.shape              = dataset_shape;
-  dataset_tensor.dl_tensor.strides            = nullptr;
+  dataset_tensor.dl_tensor.ndim = 2;
+  dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits = 32;
+  dataset_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t dataset_shape[2] = {4, 2};
+  dataset_tensor.dl_tensor.shape = dataset_shape;
+  dataset_tensor.dl_tensor.strides = nullptr;
 
   // create index
   cuvsCagraIndex_t index;
@@ -86,46 +86,46 @@ TEST(CagraC, BuildSearch)
 
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(4 * 2, stream);
-  raft::copy(queries_d.data(), (float*)queries, 4 * 2, stream);
+  raft::copy(queries_d.data(), (float *)queries, 4 * 2, stream);
 
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.data = queries_d.data();
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
-  queries_tensor.dl_tensor.ndim               = 2;
-  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
-  queries_tensor.dl_tensor.dtype.bits         = 32;
-  queries_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t queries_shape[2]                    = {4, 2};
-  queries_tensor.dl_tensor.shape              = queries_shape;
-  queries_tensor.dl_tensor.strides            = nullptr;
+  queries_tensor.dl_tensor.ndim = 2;
+  queries_tensor.dl_tensor.dtype.code = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits = 32;
+  queries_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t queries_shape[2] = {4, 2};
+  queries_tensor.dl_tensor.shape = queries_shape;
+  queries_tensor.dl_tensor.strides = nullptr;
 
   // create neighbors DLTensor
   rmm::device_uvector<uint32_t> neighbors_d(4, stream);
 
   DLManagedTensor neighbors_tensor;
-  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.data = neighbors_d.data();
   neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
-  neighbors_tensor.dl_tensor.ndim               = 2;
-  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
-  neighbors_tensor.dl_tensor.dtype.bits         = 32;
-  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t neighbors_shape[2]                    = {4, 1};
-  neighbors_tensor.dl_tensor.shape              = neighbors_shape;
-  neighbors_tensor.dl_tensor.strides            = nullptr;
+  neighbors_tensor.dl_tensor.ndim = 2;
+  neighbors_tensor.dl_tensor.dtype.code = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t neighbors_shape[2] = {4, 1};
+  neighbors_tensor.dl_tensor.shape = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides = nullptr;
 
   // create distances DLTensor
   rmm::device_uvector<float> distances_d(4, stream);
 
   DLManagedTensor distances_tensor;
-  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.data = distances_d.data();
   distances_tensor.dl_tensor.device.device_type = kDLCUDA;
-  distances_tensor.dl_tensor.ndim               = 2;
-  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
-  distances_tensor.dl_tensor.dtype.bits         = 32;
-  distances_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t distances_shape[2]                    = {4, 1};
-  distances_tensor.dl_tensor.shape              = distances_shape;
-  distances_tensor.dl_tensor.strides            = nullptr;
+  distances_tensor.dl_tensor.ndim = 2;
+  distances_tensor.dl_tensor.dtype.code = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits = 32;
+  distances_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t distances_shape[2] = {4, 1};
+  distances_tensor.dl_tensor.shape = distances_shape;
+  distances_tensor.dl_tensor.strides = nullptr;
 
   cuvsFilter filter;
   filter.type = NO_FILTER;
@@ -134,14 +134,14 @@ TEST(CagraC, BuildSearch)
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(
-    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
+  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+                  &distances_tensor, filter);
 
   // verify output
-  ASSERT_TRUE(
-    cuvs::devArrMatchHost(neighbors_exp, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
-  ASSERT_TRUE(cuvs::devArrMatchHost(
-    distances_exp, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+  ASSERT_TRUE(cuvs::devArrMatchHost(neighbors_exp, neighbors_d.data(), 4,
+                                    cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(distances_exp, distances_d.data(), 4,
+                                    cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
@@ -150,8 +150,7 @@ TEST(CagraC, BuildSearch)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildExtendSearch)
-{
+TEST(CagraC, BuildExtendSearch) {
   // create cuvsResources_t
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
@@ -162,53 +161,52 @@ TEST(CagraC, BuildExtendSearch)
 
   const int32_t dimensions = 16;
   // main_data_size needs to be >= 128 (see issue #486)
-  const int32_t main_data_size       = 1024;
+  const int32_t main_data_size = 1024;
   const int32_t additional_data_size = 64;
-  const int32_t num_queries          = 4;
+  const int32_t num_queries = 4;
 
   // create random data for datasets and queries
   rmm::device_uvector<float> random_data_d(
-    (main_data_size + additional_data_size + num_queries) * dimensions, stream);
+      (main_data_size + additional_data_size + num_queries) * dimensions,
+      stream);
   rmm::device_uvector<int32_t> random_labels_d(
-    (main_data_size + additional_data_size + num_queries) * dimensions, stream);
-  raft::random::make_blobs(random_data_d.data(),
-                           random_labels_d.data(),
+      (main_data_size + additional_data_size + num_queries) * dimensions,
+      stream);
+  raft::random::make_blobs(random_data_d.data(), random_labels_d.data(),
                            main_data_size + additional_data_size + num_queries,
-                           dimensions,
-                           10,
-                           stream);
+                           dimensions, 10, stream);
 
   // create  dataset DLTensor
   rmm::device_uvector<float> main_d(main_data_size * dimensions, stream);
   rmm::device_uvector<int32_t> main_labels_d(main_data_size, stream);
-  raft::copy(main_d.data(), random_data_d.data(), main_data_size * dimensions, stream);
+  raft::copy(main_d.data(), random_data_d.data(), main_data_size * dimensions,
+             stream);
   DLManagedTensor dataset_tensor;
-  dataset_tensor.dl_tensor.data               = main_d.data();
+  dataset_tensor.dl_tensor.data = main_d.data();
   dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
-  dataset_tensor.dl_tensor.ndim               = 2;
-  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
-  dataset_tensor.dl_tensor.dtype.bits         = 32;
-  dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t dataset_shape[2]                    = {main_data_size, dimensions};
-  dataset_tensor.dl_tensor.shape              = dataset_shape;
-  dataset_tensor.dl_tensor.strides            = nullptr;
+  dataset_tensor.dl_tensor.ndim = 2;
+  dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits = 32;
+  dataset_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t dataset_shape[2] = {main_data_size, dimensions};
+  dataset_tensor.dl_tensor.shape = dataset_shape;
+  dataset_tensor.dl_tensor.strides = nullptr;
 
   // create additional dataset DLTensor
-  rmm::device_uvector<float> additional_d(additional_data_size * dimensions, stream);
-  raft::copy(additional_d.data(),
-             random_data_d.data() + main_d.size(),
-             additional_data_size * dimensions,
-             stream);
+  rmm::device_uvector<float> additional_d(additional_data_size * dimensions,
+                                          stream);
+  raft::copy(additional_d.data(), random_data_d.data() + main_d.size(),
+             additional_data_size * dimensions, stream);
   DLManagedTensor additional_dataset_tensor;
-  additional_dataset_tensor.dl_tensor.data               = additional_d.data();
+  additional_dataset_tensor.dl_tensor.data = additional_d.data();
   additional_dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
-  additional_dataset_tensor.dl_tensor.ndim               = 2;
-  additional_dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
-  additional_dataset_tensor.dl_tensor.dtype.bits         = 32;
-  additional_dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t additional_dataset_shape[2]                    = {additional_data_size, dimensions};
-  additional_dataset_tensor.dl_tensor.shape              = additional_dataset_shape;
-  additional_dataset_tensor.dl_tensor.strides            = nullptr;
+  additional_dataset_tensor.dl_tensor.ndim = 2;
+  additional_dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  additional_dataset_tensor.dl_tensor.dtype.bits = 32;
+  additional_dataset_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t additional_dataset_shape[2] = {additional_data_size, dimensions};
+  additional_dataset_tensor.dl_tensor.shape = additional_dataset_shape;
+  additional_dataset_tensor.dl_tensor.strides = nullptr;
 
   // create index
   cuvsCagraIndex_t index;
@@ -229,61 +227,59 @@ TEST(CagraC, BuildExtendSearch)
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(num_queries * dimensions, stream);
   raft::copy(queries_d.data(),
-             random_data_d.data() + (main_data_size + additional_data_size) * dimensions,
-             num_queries * dimensions,
-             stream);
+             random_data_d.data() +
+                 (main_data_size + additional_data_size) * dimensions,
+             num_queries * dimensions, stream);
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.data = queries_d.data();
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
-  queries_tensor.dl_tensor.ndim               = 2;
-  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
-  queries_tensor.dl_tensor.dtype.bits         = 32;
-  queries_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t queries_shape[2]                    = {4, dimensions};
-  queries_tensor.dl_tensor.shape              = queries_shape;
-  queries_tensor.dl_tensor.strides            = nullptr;
+  queries_tensor.dl_tensor.ndim = 2;
+  queries_tensor.dl_tensor.dtype.code = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits = 32;
+  queries_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t queries_shape[2] = {4, dimensions};
+  queries_tensor.dl_tensor.shape = queries_shape;
+  queries_tensor.dl_tensor.strides = nullptr;
 
   // create pairwise distance matrix for dataset and queries
-  auto pairwise_distance_dataset_input =
-    raft::make_device_matrix<float>(handle, main_data_size + additional_data_size, dimensions);
+  auto pairwise_distance_dataset_input = raft::make_device_matrix<float>(
+      handle, main_data_size + additional_data_size, dimensions);
 
-  raft::copy(pairwise_distance_dataset_input.data_handle(), main_d.data(), main_d.size(), stream);
+  raft::copy(pairwise_distance_dataset_input.data_handle(), main_d.data(),
+             main_d.size(), stream);
   raft::copy(pairwise_distance_dataset_input.data_handle() + main_d.size(),
-             additional_d.data(),
-             additional_d.size(),
-             stream);
+             additional_d.data(), additional_d.size(), stream);
 
   auto pairwise_distance_queries_input =
-    raft::make_device_matrix<float>(handle, num_queries, dimensions);
+      raft::make_device_matrix<float>(handle, num_queries, dimensions);
 
   raft::copy(pairwise_distance_queries_input.data_handle(),
-             (float*)queries_d.data(),
-             num_queries * dimensions,
-             stream);
+             (float *)queries_d.data(), num_queries * dimensions, stream);
 
-  auto pairwise_distances =
-    raft::make_device_matrix<float>(handle, num_queries, (main_data_size + additional_data_size));
+  auto pairwise_distances = raft::make_device_matrix<float>(
+      handle, num_queries, (main_data_size + additional_data_size));
   auto metric = cuvs::distance::DistanceType::L2Expanded;
 
   cuvs::distance::pairwise_distance(handle,
                                     pairwise_distance_queries_input.view(),
                                     pairwise_distance_dataset_input.view(),
 
-                                    pairwise_distances.view(),
-                                    metric);
+                                    pairwise_distances.view(), metric);
 
-  auto min_cols =
-    raft::make_device_vector<uint32_t, uint32_t>(handle, pairwise_distances.extent(0));
+  auto min_cols = raft::make_device_vector<uint32_t, uint32_t>(
+      handle, pairwise_distances.extent(0));
 
-  auto distances_const_view = raft::make_device_matrix_view<const float, uint32_t>(
-    pairwise_distances.data_handle(), pairwise_distances.extent(0), pairwise_distances.extent(1));
+  auto distances_const_view =
+      raft::make_device_matrix_view<const float, uint32_t>(
+          pairwise_distances.data_handle(), pairwise_distances.extent(0),
+          pairwise_distances.extent(1));
 
   raft::matrix::argmin(handle, distances_const_view, min_cols.view());
 
   float min_cols_distances[num_queries];
 
   for (uint32_t i = 0; i < min_cols.extent(0); i++) {
-    uint32_t mc           = min_cols(i);
+    uint32_t mc = min_cols(i);
     min_cols_distances[i] = pairwise_distances(i, mc);
   }
 
@@ -291,15 +287,15 @@ TEST(CagraC, BuildExtendSearch)
   rmm::device_uvector<uint32_t> neighbors_d(4, stream);
 
   DLManagedTensor neighbors_tensor;
-  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.data = neighbors_d.data();
   neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
-  neighbors_tensor.dl_tensor.ndim               = 2;
-  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
-  neighbors_tensor.dl_tensor.dtype.bits         = 32;
-  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t neighbors_shape[2]                    = {num_queries, 1};
-  neighbors_tensor.dl_tensor.shape              = neighbors_shape;
-  neighbors_tensor.dl_tensor.strides            = nullptr;
+  neighbors_tensor.dl_tensor.ndim = 2;
+  neighbors_tensor.dl_tensor.dtype.code = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t neighbors_shape[2] = {num_queries, 1};
+  neighbors_tensor.dl_tensor.shape = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides = nullptr;
 
   // create distances DLTensor
   rmm::device_uvector<float> distances_d(4, stream);
@@ -307,15 +303,15 @@ TEST(CagraC, BuildExtendSearch)
   distances_d.resize(4, stream);
 
   DLManagedTensor distances_tensor;
-  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.data = distances_d.data();
   distances_tensor.dl_tensor.device.device_type = kDLCUDA;
-  distances_tensor.dl_tensor.ndim               = 2;
-  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
-  distances_tensor.dl_tensor.dtype.bits         = 32;
-  distances_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t distances_shape[2]                    = {num_queries, 1};
-  distances_tensor.dl_tensor.shape              = distances_shape;
-  distances_tensor.dl_tensor.strides            = nullptr;
+  distances_tensor.dl_tensor.ndim = 2;
+  distances_tensor.dl_tensor.dtype.code = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits = 32;
+  distances_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t distances_shape[2] = {num_queries, 1};
+  distances_tensor.dl_tensor.shape = distances_shape;
+  distances_tensor.dl_tensor.strides = nullptr;
 
   cuvsFilter filter;
   filter.type = NO_FILTER;
@@ -324,16 +320,16 @@ TEST(CagraC, BuildExtendSearch)
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(
-    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
+  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+                  &distances_tensor, filter);
 
   // check neighbors
-  ASSERT_TRUE(
-    cuvs::devArrMatch(min_cols.data_handle(), neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatch(min_cols.data_handle(), neighbors_d.data(), 4,
+                                cuvs::Compare<uint32_t>()));
 
   // check distances
-  ASSERT_TRUE(cuvs::devArrMatchHost(
-    min_cols_distances, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+  ASSERT_TRUE(cuvs::devArrMatchHost(min_cols_distances, distances_d.data(), 4,
+                                    cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
@@ -343,8 +339,7 @@ TEST(CagraC, BuildExtendSearch)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildSearchFiltered)
-{
+TEST(CagraC, BuildSearchBitsetFiltered) {
   // create cuvsResources_t
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
@@ -353,15 +348,15 @@ TEST(CagraC, BuildSearchFiltered)
 
   // create dataset DLTensor
   DLManagedTensor dataset_tensor;
-  dataset_tensor.dl_tensor.data               = dataset;
+  dataset_tensor.dl_tensor.data = dataset;
   dataset_tensor.dl_tensor.device.device_type = kDLCPU;
-  dataset_tensor.dl_tensor.ndim               = 2;
-  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
-  dataset_tensor.dl_tensor.dtype.bits         = 32;
-  dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t dataset_shape[2]                    = {4, 2};
-  dataset_tensor.dl_tensor.shape              = dataset_shape;
-  dataset_tensor.dl_tensor.strides            = nullptr;
+  dataset_tensor.dl_tensor.ndim = 2;
+  dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits = 32;
+  dataset_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t dataset_shape[2] = {4, 2};
+  dataset_tensor.dl_tensor.shape = dataset_shape;
+  dataset_tensor.dl_tensor.strides = nullptr;
 
   // create index
   cuvsCagraIndex_t index;
@@ -374,46 +369,46 @@ TEST(CagraC, BuildSearchFiltered)
 
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(4 * 2, stream);
-  raft::copy(queries_d.data(), (float*)queries, 4 * 2, stream);
+  raft::copy(queries_d.data(), (float *)queries, 4 * 2, stream);
 
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.data = queries_d.data();
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
-  queries_tensor.dl_tensor.ndim               = 2;
-  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
-  queries_tensor.dl_tensor.dtype.bits         = 32;
-  queries_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t queries_shape[2]                    = {4, 2};
-  queries_tensor.dl_tensor.shape              = queries_shape;
-  queries_tensor.dl_tensor.strides            = nullptr;
+  queries_tensor.dl_tensor.ndim = 2;
+  queries_tensor.dl_tensor.dtype.code = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits = 32;
+  queries_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t queries_shape[2] = {4, 2};
+  queries_tensor.dl_tensor.shape = queries_shape;
+  queries_tensor.dl_tensor.strides = nullptr;
 
   // create neighbors DLTensor
   rmm::device_uvector<uint32_t> neighbors_d(4, stream);
 
   DLManagedTensor neighbors_tensor;
-  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
+  neighbors_tensor.dl_tensor.data = neighbors_d.data();
   neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
-  neighbors_tensor.dl_tensor.ndim               = 2;
-  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
-  neighbors_tensor.dl_tensor.dtype.bits         = 32;
-  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t neighbors_shape[2]                    = {4, 1};
-  neighbors_tensor.dl_tensor.shape              = neighbors_shape;
-  neighbors_tensor.dl_tensor.strides            = nullptr;
+  neighbors_tensor.dl_tensor.ndim = 2;
+  neighbors_tensor.dl_tensor.dtype.code = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t neighbors_shape[2] = {4, 1};
+  neighbors_tensor.dl_tensor.shape = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides = nullptr;
 
   // create distances DLTensor
   rmm::device_uvector<float> distances_d(4, stream);
 
   DLManagedTensor distances_tensor;
-  distances_tensor.dl_tensor.data               = distances_d.data();
+  distances_tensor.dl_tensor.data = distances_d.data();
   distances_tensor.dl_tensor.device.device_type = kDLCUDA;
-  distances_tensor.dl_tensor.ndim               = 2;
-  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
-  distances_tensor.dl_tensor.dtype.bits         = 32;
-  distances_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t distances_shape[2]                    = {4, 1};
-  distances_tensor.dl_tensor.shape              = distances_shape;
-  distances_tensor.dl_tensor.strides            = nullptr;
+  distances_tensor.dl_tensor.ndim = 2;
+  distances_tensor.dl_tensor.dtype.code = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits = 32;
+  distances_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t distances_shape[2] = {4, 1};
+  distances_tensor.dl_tensor.shape = distances_shape;
+  distances_tensor.dl_tensor.strides = nullptr;
 
   // create filter DLTensor
   rmm::device_uvector<uint32_t> filter_d(1, stream);
@@ -422,15 +417,15 @@ TEST(CagraC, BuildSearchFiltered)
   cuvsFilter filter;
 
   DLManagedTensor filter_tensor;
-  filter_tensor.dl_tensor.data               = filter_d.data();
+  filter_tensor.dl_tensor.data = filter_d.data();
   filter_tensor.dl_tensor.device.device_type = kDLCUDA;
-  filter_tensor.dl_tensor.ndim               = 1;
-  filter_tensor.dl_tensor.dtype.code         = kDLUInt;
-  filter_tensor.dl_tensor.dtype.bits         = 32;
-  filter_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t filter_shape[1]                    = {1};
-  filter_tensor.dl_tensor.shape              = filter_shape;
-  filter_tensor.dl_tensor.strides            = nullptr;
+  filter_tensor.dl_tensor.ndim = 1;
+  filter_tensor.dl_tensor.dtype.code = kDLUInt;
+  filter_tensor.dl_tensor.dtype.bits = 32;
+  filter_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t filter_shape[1] = {1};
+  filter_tensor.dl_tensor.shape = filter_shape;
+  filter_tensor.dl_tensor.strides = nullptr;
 
   filter.type = BITSET;
   filter.addr = (uintptr_t)&filter_tensor;
@@ -438,13 +433,13 @@ TEST(CagraC, BuildSearchFiltered)
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(
-    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
+  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+                  &distances_tensor, filter);
   // verify output
-  ASSERT_TRUE(cuvs::devArrMatchHost(
-    neighbors_exp_filtered, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
-  ASSERT_TRUE(cuvs::devArrMatchHost(
-    distances_exp_filtered, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+  ASSERT_TRUE(cuvs::devArrMatchHost(neighbors_exp_filtered, neighbors_d.data(),
+                                    4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(distances_exp_filtered, distances_d.data(),
+                                    4, cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
@@ -453,24 +448,158 @@ TEST(CagraC, BuildSearchFiltered)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildMergeSearch)
-{
+TEST(CagraC, BuildSearchBitmapFiltered) {
+  int64_t n_rows = 100;
+  int64_t n_queries = 10;
+  int64_t n_dim = 16;
+  uint32_t n_neighbors = 4;
+
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  // Generate data
+  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
+  raft::random::RngState r(1234ULL);
+  raft::random::uniform(handle, r, index_data.data(), n_rows * n_dim,
+                        float(0.1), float(2.0));
+  raft::random::uniform(handle, r, query_data.data(), n_queries * n_dim,
+                        float(0.1), float(2.0));
+
+  // create cuvsResources_t
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+
+  // create dataset DLTensor
+  DLManagedTensor dataset_tensor;
+  dataset_tensor.dl_tensor.data = index_data.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.ndim = 2;
+  dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits = 32;
+  dataset_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t dataset_shape[2] = {n_rows, n_dim};
+  dataset_tensor.dl_tensor.shape = dataset_shape;
+  dataset_tensor.dl_tensor.strides = nullptr;
+
+  // create index
+  cuvsCagraIndex_t index;
+  cuvsCagraIndexCreate(&index);
+
+  // build index
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+  cuvsCagraBuild(res, build_params, &dataset_tensor, index);
+
+  // create queries DLTensor
+  DLManagedTensor queries_tensor;
+  queries_tensor.dl_tensor.data = query_data.data();
+  queries_tensor.dl_tensor.device.device_type = kDLCUDA;
+  queries_tensor.dl_tensor.ndim = 2;
+  queries_tensor.dl_tensor.dtype.code = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits = 32;
+  queries_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t queries_shape[2] = {n_queries, n_dim};
+  queries_tensor.dl_tensor.shape = queries_shape;
+  queries_tensor.dl_tensor.strides = nullptr;
+
+  // create neighbors DLTensor
+  rmm::device_uvector<uint32_t> neighbors_data(n_queries * n_neighbors, stream);
+  DLManagedTensor neighbors_tensor;
+  neighbors_tensor.dl_tensor.data = neighbors_data.data();
+  neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
+  neighbors_tensor.dl_tensor.ndim = 2;
+  neighbors_tensor.dl_tensor.dtype.code = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t neighbors_shape[2] = {n_queries, n_neighbors};
+  neighbors_tensor.dl_tensor.shape = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides = nullptr;
+
+  // create distances DLTensor
+  rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
+  DLManagedTensor distances_tensor;
+  distances_tensor.dl_tensor.data = distances_data.data();
+  distances_tensor.dl_tensor.device.device_type = kDLCUDA;
+  distances_tensor.dl_tensor.ndim = 2;
+  distances_tensor.dl_tensor.dtype.code = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits = 32;
+  distances_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t distances_shape[2] = {n_queries, n_neighbors};
+  distances_tensor.dl_tensor.shape = distances_shape;
+  distances_tensor.dl_tensor.strides = nullptr;
+
+  // Create bitmap filter - per query filter
+  // For each query, remove even indices
+  auto bitmap_size =
+      n_queries * ((n_rows + 31) / 32); // n_queries x (bits for n_rows)
+  rmm::device_uvector<uint32_t> filter_bitmap(bitmap_size, stream);
+  std::vector<uint32_t> filter_bitmap_h(bitmap_size);
+  for (size_t q = 0; q < n_queries; ++q) {
+    for (size_t i = 0; i < (n_rows + 31) / 32; ++i) {
+      filter_bitmap_h[q * ((n_rows + 31) / 32) + i] =
+          0xAAAAAAAA; // 10101010... pattern - removes even indices
+    }
+  }
+  raft::copy(filter_bitmap.data(), filter_bitmap_h.data(), bitmap_size, stream);
+
+  DLManagedTensor filter_tensor;
+  filter_tensor.dl_tensor.data = filter_bitmap.data();
+  filter_tensor.dl_tensor.device.device_type = kDLCUDA;
+  filter_tensor.dl_tensor.ndim = 1;
+  filter_tensor.dl_tensor.dtype.code = kDLUInt;
+  filter_tensor.dl_tensor.dtype.bits = 32;
+  filter_tensor.dl_tensor.dtype.lanes = 1;
+  int64_t filter_shape[1] = {bitmap_size};
+  filter_tensor.dl_tensor.shape = filter_shape;
+  filter_tensor.dl_tensor.strides = nullptr;
+
+  cuvsFilter filter;
+  filter.type = BITMAP;
+  filter.addr = (uintptr_t)&filter_tensor;
+
+  // search index with bitmap filter
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+                  &distances_tensor, filter);
+
+  // Verify all returned neighbors are odd indices (not filtered out)
+  std::vector<uint32_t> neighbors_h(n_queries * n_neighbors);
+  raft::copy(neighbors_h.data(), neighbors_data.data(), n_queries * n_neighbors,
+             stream);
+  raft::resource::sync_stream(handle);
+
+  for (size_t i = 0; i < n_queries * n_neighbors; ++i) {
+    // All neighbors should be odd indices (since even indices are filtered)
+    // Note: uint32_t max value indicates no valid neighbor found
+    ASSERT_TRUE(neighbors_h[i] % 2 == 1 ||
+                neighbors_h[i] == std::numeric_limits<uint32_t>::max())
+        << "Neighbor at position " << i << " has value " << neighbors_h[i]
+        << " which is an even index (should be filtered)";
+  }
+
+  // de-allocate index and res
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  cuvsCagraIndexDestroy(index);
+  cuvsResourcesDestroy(res);
+}
+
+TEST(CagraC, BuildMergeSearch) {
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
   cudaStream_t stream;
   cuvsStreamGet(res, &stream);
 
-  float dataset[7][2] = {{0.74021935f, 0.92099380f},
-                         {0.03902049f, 0.96896291f},
-                         {0.92514056f, 0.44635010f},
-                         {0.12345678f, 0.87654321f},
-                         {0.50112233f, 0.33221100f},
-                         {0.66731918f, 0.10993068f},
+  float dataset[7][2] = {{0.74021935f, 0.92099380f}, {0.03902049f, 0.96896291f},
+                         {0.92514056f, 0.44635010f}, {0.12345678f, 0.87654321f},
+                         {0.50112233f, 0.33221100f}, {0.66731918f, 0.10993068f},
                          {0.77777777f, 0.88888888f}};
 
-  float* main_data_ptr       = &dataset[0][0];
-  float* additional_data_ptr = &dataset[4][0];
-  float* query_data_ptr      = &dataset[6][0];
+  float *main_data_ptr = &dataset[0][0];
+  float *additional_data_ptr = &dataset[4][0];
+  float *query_data_ptr = &dataset[6][0];
 
   rmm::device_uvector<float> main_d(8, stream);
   rmm::device_uvector<float> additional_d(6, stream);
@@ -480,25 +609,25 @@ TEST(CagraC, BuildMergeSearch)
   raft::copy(queries_d.data(), query_data_ptr, 2, stream);
 
   DLManagedTensor main_dataset_tensor;
-  int64_t main_shape[2]                            = {4, 2};
-  main_dataset_tensor.dl_tensor.data               = main_d.data();
+  int64_t main_shape[2] = {4, 2};
+  main_dataset_tensor.dl_tensor.data = main_d.data();
   main_dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
-  main_dataset_tensor.dl_tensor.device.device_id   = 0;
-  main_dataset_tensor.dl_tensor.ndim               = 2;
-  main_dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
-  main_dataset_tensor.dl_tensor.dtype.bits         = 32;
-  main_dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  main_dataset_tensor.dl_tensor.shape              = main_shape;
-  main_dataset_tensor.dl_tensor.strides            = nullptr;
+  main_dataset_tensor.dl_tensor.device.device_id = 0;
+  main_dataset_tensor.dl_tensor.ndim = 2;
+  main_dataset_tensor.dl_tensor.dtype.code = kDLFloat;
+  main_dataset_tensor.dl_tensor.dtype.bits = 32;
+  main_dataset_tensor.dl_tensor.dtype.lanes = 1;
+  main_dataset_tensor.dl_tensor.shape = main_shape;
+  main_dataset_tensor.dl_tensor.strides = nullptr;
 
   DLManagedTensor additional_dataset_tensor = main_dataset_tensor;
-  int64_t additional_shape[2]               = {3, 2};
-  additional_dataset_tensor.dl_tensor.data  = additional_d.data();
+  int64_t additional_shape[2] = {3, 2};
+  additional_dataset_tensor.dl_tensor.data = additional_d.data();
   additional_dataset_tensor.dl_tensor.shape = additional_shape;
 
   DLManagedTensor query_tensor = main_dataset_tensor;
-  int64_t query_shape[2]       = {1, 2};
-  query_tensor.dl_tensor.data  = queries_d.data();
+  int64_t query_shape[2] = {1, 2};
+  query_tensor.dl_tensor.data = queries_d.data();
   query_tensor.dl_tensor.shape = query_shape;
 
   cuvsCagraIndexParams_t build_params;
@@ -506,8 +635,11 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraIndex_t index_main, index_add;
   cuvsCagraIndexCreate(&index_main);
   cuvsCagraIndexCreate(&index_add);
-  ASSERT_EQ(cuvsCagraBuild(res, build_params, &main_dataset_tensor, index_main), CUVS_SUCCESS);
-  ASSERT_EQ(cuvsCagraBuild(res, build_params, &additional_dataset_tensor, index_add), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraBuild(res, build_params, &main_dataset_tensor, index_main),
+            CUVS_SUCCESS);
+  ASSERT_EQ(
+      cuvsCagraBuild(res, build_params, &additional_dataset_tensor, index_add),
+      CUVS_SUCCESS);
 
   cuvsCagraMergeParams_t merge_params;
   cuvsCagraMergeParamsCreate(&merge_params);
@@ -515,7 +647,8 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraIndexCreate(&index_merged);
 
   cuvsCagraIndex_t index_array[2] = {index_main, index_add};
-  ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged),
+            CUVS_SUCCESS);
 
   int64_t merged_dim = -1;
   ASSERT_EQ(cuvsCagraIndexGetDims(index_merged, &merged_dim), CUVS_SUCCESS);
@@ -524,24 +657,24 @@ TEST(CagraC, BuildMergeSearch)
   DLManagedTensor neighbors_tensor, distances_tensor;
   rmm::device_uvector<int64_t> neighbors_d(1, stream);
   rmm::device_uvector<float> distances_d(1, stream);
-  int64_t neighbors_shape[2]             = {1, 1};
-  int64_t distances_shape[2]             = {1, 1};
-  neighbors_tensor.dl_tensor.data        = neighbors_d.data();
-  neighbors_tensor.dl_tensor.device      = main_dataset_tensor.dl_tensor.device;
-  neighbors_tensor.dl_tensor.ndim        = 2;
-  neighbors_tensor.dl_tensor.dtype.code  = kDLInt;
-  neighbors_tensor.dl_tensor.dtype.bits  = 64;
+  int64_t neighbors_shape[2] = {1, 1};
+  int64_t distances_shape[2] = {1, 1};
+  neighbors_tensor.dl_tensor.data = neighbors_d.data();
+  neighbors_tensor.dl_tensor.device = main_dataset_tensor.dl_tensor.device;
+  neighbors_tensor.dl_tensor.ndim = 2;
+  neighbors_tensor.dl_tensor.dtype.code = kDLInt;
+  neighbors_tensor.dl_tensor.dtype.bits = 64;
   neighbors_tensor.dl_tensor.dtype.lanes = 1;
-  neighbors_tensor.dl_tensor.shape       = neighbors_shape;
-  neighbors_tensor.dl_tensor.strides     = nullptr;
-  distances_tensor.dl_tensor.data        = distances_d.data();
-  distances_tensor.dl_tensor.device      = main_dataset_tensor.dl_tensor.device;
-  distances_tensor.dl_tensor.ndim        = 2;
-  distances_tensor.dl_tensor.dtype.code  = kDLFloat;
-  distances_tensor.dl_tensor.dtype.bits  = 32;
+  neighbors_tensor.dl_tensor.shape = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides = nullptr;
+  distances_tensor.dl_tensor.data = distances_d.data();
+  distances_tensor.dl_tensor.device = main_dataset_tensor.dl_tensor.device;
+  distances_tensor.dl_tensor.ndim = 2;
+  distances_tensor.dl_tensor.dtype.code = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits = 32;
   distances_tensor.dl_tensor.dtype.lanes = 1;
-  distances_tensor.dl_tensor.shape       = distances_shape;
-  distances_tensor.dl_tensor.strides     = nullptr;
+  distances_tensor.dl_tensor.shape = distances_shape;
+  distances_tensor.dl_tensor.strides = nullptr;
 
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
@@ -550,17 +683,12 @@ TEST(CagraC, BuildMergeSearch)
   cuvsFilter filter;
   filter.type = NO_FILTER;
   filter.addr = 0;
-  ASSERT_EQ(cuvsCagraSearch(res,
-                            search_params,
-                            index_merged,
-                            &query_tensor,
-                            &neighbors_tensor,
-                            &distances_tensor,
-                            filter),
+  ASSERT_EQ(cuvsCagraSearch(res, search_params, index_merged, &query_tensor,
+                            &neighbors_tensor, &distances_tensor, filter),
             CUVS_SUCCESS);
 
   int64_t neighbor_host = -1;
-  float distance_host   = 1.0f;
+  float distance_host = 1.0f;
   raft::copy(&neighbor_host, neighbors_d.data(), 1, stream);
   raft::copy(&distance_host, distances_d.data(), 1, stream);
   cudaStreamSynchronize(stream);
