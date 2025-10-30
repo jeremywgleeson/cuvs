@@ -73,3 +73,18 @@ mod search_params;
 pub use index::Index;
 pub use index_params::{BuildAlgo, CompressionParams, IndexParams};
 pub use search_params::{HashMode, SearchAlgo, SearchParams};
+
+/// Serialization options for CAGRA index
+#[derive(Debug, Clone, Copy)]
+pub struct SerializeOptions {
+    /// Whether to include the dataset in the serialized output
+    pub include_dataset: bool,
+}
+
+impl Default for SerializeOptions {
+    fn default() -> Self {
+        Self {
+            include_dataset: true,
+        }
+    }
+}

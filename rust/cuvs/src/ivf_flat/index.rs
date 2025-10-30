@@ -175,6 +175,46 @@ impl Drop for Index {
     }
 }
 
+// Streaming serialization support
+impl crate::streaming::FileSerialize for Index {
+    type Options = ();
+
+    fn write_to_file(
+        &self,
+        res: &Resources,
+        path: &std::path::Path,
+        _options: (),
+    ) -> Result<()> {
+        self.serialize(res, path)
+    }
+}
+
+impl crate::streaming::FileDeserialize for Index {
+    fn read_from_file(res: &Resources, path: &std::path::Path) -> Result<Self> {
+        Self::deserialize(res, path)
+    }
+}
+
+impl crate::streaming::StreamSerialize for Index {
+    type Options = ();
+
+    fn stream_serialize<W: std::io::Write + Send + 'static>(
+        &self,
+        res: &Resources,
+        writer: W,
+        _options: (),
+    ) -> Result<()> {
+        crate::streaming::stream_serialize_impl(res, self, writer, ())
+    }
+
+    fn stream_deserialize<R: std::io::Read + Send + 'static>(
+        res: &Resources,
+        reader: R,
+    ) -> Result<Self> {
+        crate::streaming::stream_deserialize_impl(res, reader)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -16,7 +16,7 @@
 //! # Supported Index Types
 //!
 //! All index types implement the [`StreamSerialize`] trait for generic usage:
-//! - **CAGRA**: Options = [`CagraSerializeOptions`]
+//! - **CAGRA**: Options = [`crate::cagra::SerializeOptions`]
 //! - **IVF-Flat**: Options = `()`
 //! - **IVF-PQ**: Options = `()`
 //!
@@ -30,8 +30,8 @@
 //! ## Generic trait-based usage
 //!
 //! ```no_run
-//! use cuvs::streaming::{StreamSerialize, CagraSerializeOptions};
-//! use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::streaming::StreamSerialize;
+//! use cuvs::cagra::{Index, IndexParams, SerializeOptions};
 //! use cuvs::resources::Resources;
 //! use std::fs::File;
 //! use flate2::write::GzEncoder;
@@ -45,14 +45,14 @@
 //! // Use trait method - works with any index type
 //! let file = File::create("index.bin.gz").unwrap();
 //! let encoder = GzEncoder::new(file, Compression::default());
-//! index.stream_serialize(&res, encoder, CagraSerializeOptions { include_dataset: true }).unwrap();
+//! index.stream_serialize(&res, encoder, SerializeOptions { include_dataset: true }).unwrap();
 //! ```
 //!
 //! ## Serialize and deserialize with compression
 //!
 //! ```no_run
-//! use cuvs::streaming::{StreamSerialize, CagraSerializeOptions};
-//! use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::streaming::StreamSerialize;
+//! use cuvs::cagra::{Index, IndexParams, SerializeOptions};
 //! use cuvs::resources::Resources;
 //! use std::fs::File;
 //! use flate2::write::GzEncoder;
@@ -67,7 +67,7 @@
 //! // Serialize with compression
 //! let file = File::create("index.bin.gz").unwrap();
 //! let encoder = GzEncoder::new(file, Compression::default());
-//! index.stream_serialize(&res, encoder, CagraSerializeOptions { include_dataset: true }).unwrap();
+//! index.stream_serialize(&res, encoder, SerializeOptions { include_dataset: true }).unwrap();
 //!
 //! // Deserialize from compressed file
 //! let file = File::open("index.bin.gz").unwrap();
@@ -78,8 +78,8 @@
 //! ## Stream to a Vec (in-memory buffer)
 //!
 //! ```no_run
-//! use cuvs::streaming::{StreamSerialize, CagraSerializeOptions};
-//! # use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::streaming::StreamSerialize;
+//! use cuvs::cagra::{Index, IndexParams, SerializeOptions};
 //! # use cuvs::resources::Resources;
 //! # let res = Resources::new().unwrap();
 //! # let params = IndexParams::new().unwrap();
@@ -87,7 +87,7 @@
 //! # let index = Index::build(&res, &params, &dataset).unwrap();
 //!
 //! let mut buffer = Vec::new();
-//! index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
+//! index.stream_serialize(&res, &mut buffer, SerializeOptions { include_dataset: true }).unwrap();
 //! println!("Serialized {} bytes", buffer.len());
 //! ```
 
@@ -97,7 +97,7 @@ use std::io::{Read, Write};
 
 /// Trait for types that support streaming serialization/deserialization
 pub trait StreamSerialize: Sized {
-    /// Serialization options (e.g., `CagraSerializeOptions` for CAGRA, `()` for no options)
+    /// Serialization options (e.g., `crate::cagra::SerializeOptions` for CAGRA, `()` for no options)
     type Options;
 
     /// Serialize to a writer without buffering entire data in memory
@@ -112,78 +112,15 @@ pub trait StreamSerialize: Sized {
     fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self>;
 }
 
-/// Serialization options for CAGRA index
-#[derive(Debug, Clone, Copy)]
-pub struct CagraSerializeOptions {
-    /// Whether to include the dataset in the serialized output
-    pub include_dataset: bool,
-}
-
-impl Default for CagraSerializeOptions {
-    fn default() -> Self {
-        Self {
-            include_dataset: true,
-        }
-    }
-}
-
 // Internal trait for types that can serialize to a file path
-trait FileSerialize {
+pub(crate) trait FileSerialize {
     type Options;
     fn write_to_file(&self, res: &Resources, path: &std::path::Path, options: Self::Options) -> Result<()>;
 }
 
-/// Internal trait for types that can deserialize from a file path
-trait FileDeserialize: Sized {
+// Internal trait for types that can deserialize from a file path
+pub(crate) trait FileDeserialize: Sized {
     fn read_from_file(res: &Resources, path: &std::path::Path) -> Result<Self>;
-}
-
-// Implement FileSerialize for CAGRA index
-impl FileSerialize for crate::cagra::Index {
-    type Options = CagraSerializeOptions;
-
-    fn write_to_file(&self, res: &Resources, path: &std::path::Path, options: CagraSerializeOptions) -> Result<()> {
-        self.serialize(res, path, options.include_dataset)
-    }
-}
-
-// Implement FileDeserialize for CAGRA index
-impl FileDeserialize for crate::cagra::Index {
-    fn read_from_file(res: &Resources, path: &std::path::Path) -> Result<Self> {
-        Self::deserialize(res, path)
-    }
-}
-
-// Implement FileSerialize for IVF-Flat index
-impl FileSerialize for crate::ivf_flat::Index {
-    type Options = ();
-
-    fn write_to_file(&self, res: &Resources, path: &std::path::Path, _options: ()) -> Result<()> {
-        self.serialize(res, path)
-    }
-}
-
-// Implement FileDeserialize for IVF-Flat index
-impl FileDeserialize for crate::ivf_flat::Index {
-    fn read_from_file(res: &Resources, path: &std::path::Path) -> Result<Self> {
-        Self::deserialize(res, path)
-    }
-}
-
-// Implement FileSerialize for IVF-PQ index
-impl FileSerialize for crate::ivf_pq::Index {
-    type Options = ();
-
-    fn write_to_file(&self, res: &Resources, path: &std::path::Path, _options: ()) -> Result<()> {
-        self.serialize(res, path)
-    }
-}
-
-// Implement FileDeserialize for IVF-PQ index
-impl FileDeserialize for crate::ivf_pq::Index {
-    fn read_from_file(res: &Resources, path: &std::path::Path) -> Result<Self> {
-        Self::deserialize(res, path)
-    }
 }
 
 /// Generate a cryptographically secure random filename component
@@ -209,7 +146,7 @@ fn generate_random_name() -> String {
 
 /// Generic implementation for Unix platforms using named pipes
 #[cfg(unix)]
-fn stream_serialize_impl<T, W>(
+pub(crate) fn stream_serialize_impl<T, W>(
     res: &Resources,
     index: &T,
     mut writer: W,
@@ -262,7 +199,7 @@ where
 
 /// Generic implementation for non-Unix platforms using temporary files
 #[cfg(not(unix))]
-fn stream_serialize_impl<T, W>(
+pub(crate) fn stream_serialize_impl<T, W>(
     res: &Resources,
     index: &T,
     mut writer: W,
@@ -289,7 +226,7 @@ where
 
 /// Generic implementation for Unix platforms using named pipes
 #[cfg(unix)]
-fn stream_deserialize_impl<T, R>(res: &Resources, mut reader: R) -> Result<T>
+pub(crate) fn stream_deserialize_impl<T, R>(res: &Resources, mut reader: R) -> Result<T>
 where
     T: FileDeserialize,
     R: Read + Send + 'static,
@@ -336,7 +273,7 @@ where
 
 /// Generic implementation for non-Unix platforms using temporary files
 #[cfg(not(unix))]
-fn stream_deserialize_impl<T, R>(res: &Resources, mut reader: R) -> Result<T>
+pub(crate) fn stream_deserialize_impl<T, R>(res: &Resources, mut reader: R) -> Result<T>
 where
     T: FileDeserialize,
     R: Read + Send + 'static,
@@ -354,66 +291,6 @@ where
     let result = T::read_from_file(res, &temp_path);
     let _ = fs::remove_file(&temp_path);
     result
-}
-
-/// CAGRA index streaming implementation
-///
-/// Uses `CagraSerializeOptions` to control serialization behavior.
-impl StreamSerialize for crate::cagra::Index {
-    type Options = CagraSerializeOptions;
-
-    fn stream_serialize<W: Write + Send + 'static>(
-        &self,
-        res: &Resources,
-        writer: W,
-        options: CagraSerializeOptions,
-    ) -> Result<()> {
-        stream_serialize_impl(res, self, writer, options)
-    }
-
-    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
-        stream_deserialize_impl(res, reader)
-    }
-}
-
-/// IVF-Flat index streaming implementation
-///
-/// Uses `()` for Options since it has no serialization options.
-impl StreamSerialize for crate::ivf_flat::Index {
-    type Options = ();
-
-    fn stream_serialize<W: Write + Send + 'static>(
-        &self,
-        res: &Resources,
-        writer: W,
-        _options: (),
-    ) -> Result<()> {
-        stream_serialize_impl(res, self, writer, ())
-    }
-
-    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
-        stream_deserialize_impl(res, reader)
-    }
-}
-
-/// IVF-PQ index streaming implementation
-///
-/// Uses `()` for Options since it has no serialization options.
-impl StreamSerialize for crate::ivf_pq::Index {
-    type Options = ();
-
-    fn stream_serialize<W: Write + Send + 'static>(
-        &self,
-        res: &Resources,
-        writer: W,
-        _options: (),
-    ) -> Result<()> {
-        stream_serialize_impl(res, self, writer, ())
-    }
-
-    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
-        stream_deserialize_impl(res, reader)
-    }
 }
 
 #[cfg(test)]
@@ -444,7 +321,7 @@ mod tests {
 
         // Serialize to a Vec
         let mut buffer = Vec::new();
-        index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
+        index.stream_serialize(&res, &mut buffer, crate::cagra::SerializeOptions { include_dataset: true }).unwrap();
 
         // Should have serialized data
         assert!(buffer.len() > 0);
@@ -458,7 +335,7 @@ mod tests {
 
         // Serialize to memory
         let mut buffer = Vec::new();
-        index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
+        index.stream_serialize(&res, &mut buffer, crate::cagra::SerializeOptions { include_dataset: true }).unwrap();
         assert!(buffer.len() > 0);
 
         // Deserialize from memory
@@ -498,10 +375,10 @@ mod tests {
 
         // Serialize without dataset
         let mut buffer_with = Vec::new();
-        index.stream_serialize(&res, &mut buffer_with, CagraSerializeOptions { include_dataset: true }).unwrap();
+        index.stream_serialize(&res, &mut buffer_with, crate::cagra::SerializeOptions { include_dataset: true }).unwrap();
 
         let mut buffer_without = Vec::new();
-        index.stream_serialize(&res, &mut buffer_without, CagraSerializeOptions { include_dataset: false }).unwrap();
+        index.stream_serialize(&res, &mut buffer_without, crate::cagra::SerializeOptions { include_dataset: false }).unwrap();
 
         // Without dataset should be smaller
         assert!(buffer_without.len() < buffer_with.len());
@@ -519,7 +396,7 @@ mod tests {
 
         // Serialize to Vec
         let mut buffer = Vec::new();
-        index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
+        index.stream_serialize(&res, &mut buffer, crate::cagra::SerializeOptions { include_dataset: true }).unwrap();
 
         // Buffer should contain data
         assert!(!buffer.is_empty());
@@ -545,7 +422,7 @@ mod tests {
         let (cagra_index, _) = build_test_index(&res);
 
         // Serialize using generic function
-        let buffer = serialize_any_index(&res, &cagra_index, CagraSerializeOptions { include_dataset: true });
+        let buffer = serialize_any_index(&res, &cagra_index, crate::cagra::SerializeOptions { include_dataset: true });
         assert!(!buffer.is_empty());
     }
 
@@ -571,7 +448,7 @@ mod tests {
             .count();
 
         // Serialize
-        index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
+        index.stream_serialize(&res, &mut buffer, crate::cagra::SerializeOptions { include_dataset: true }).unwrap();
 
         // Verify no new cuvs temp files remain (all cleaned up)
         let after_count = std::fs::read_dir(&temp_dir)
