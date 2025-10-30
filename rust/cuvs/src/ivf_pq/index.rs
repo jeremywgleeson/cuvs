@@ -67,6 +67,11 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
+            let prefilter = ffi::cuvsFilter {
+                addr: 0,
+                type_: ffi::cuvsFilterType::NO_FILTER,
+            };
+
             check_cuvs(ffi::cuvsIvfPqSearch(
                 res.0,
                 params.0,
@@ -74,8 +79,86 @@ impl Index {
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
+                prefilter,
             ))
         }
+    }
+
+    /// Serialize the IVF-PQ index to a file
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - Path to the file where the index will be saved
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use cuvs::ivf_pq::{Index, IndexParams};
+    /// # use cuvs::resources::Resources;
+    /// # let res = Resources::new().unwrap();
+    /// # let params = IndexParams::new().unwrap();
+    /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
+    /// # let index = Index::build(&res, &params, &dataset).unwrap();
+    /// index.serialize(&res, "index.bin").unwrap();
+    /// ```
+    pub fn serialize(
+        &self,
+        res: &Resources,
+        filename: impl AsRef<std::path::Path>,
+    ) -> Result<()> {
+        use std::ffi::CString;
+        let filename = CString::new(
+            filename
+                .as_ref()
+                .to_str()
+                .ok_or_else(|| crate::error::Error::new("Invalid filename"))?,
+        )
+        .map_err(|_| crate::error::Error::new("Invalid filename with null bytes"))?;
+
+        unsafe {
+            check_cuvs(ffi::cuvsIvfPqSerialize(
+                res.0,
+                filename.as_ptr(),
+                self.0,
+            ))
+        }
+    }
+
+    /// Deserialize an IVF-PQ index from a file
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - Path to the file containing the serialized index
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use cuvs::ivf_pq::Index;
+    /// # use cuvs::resources::Resources;
+    /// # let res = Resources::new().unwrap();
+    /// let index = Index::deserialize(&res, "index.bin").unwrap();
+    /// ```
+    pub fn deserialize(res: &Resources, filename: impl AsRef<std::path::Path>) -> Result<Index> {
+        use std::ffi::CString;
+        let filename = CString::new(
+            filename
+                .as_ref()
+                .to_str()
+                .ok_or_else(|| crate::error::Error::new("Invalid filename"))?,
+        )
+        .map_err(|_| crate::error::Error::new("Invalid filename with null bytes"))?;
+
+        let index = Index::new()?;
+        unsafe {
+            check_cuvs(ffi::cuvsIvfPqDeserialize(
+                res.0,
+                filename.as_ptr(),
+                index.0,
+            ))?;
+        }
+        Ok(index)
     }
 }
 

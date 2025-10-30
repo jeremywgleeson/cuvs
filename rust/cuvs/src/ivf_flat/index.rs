@@ -83,6 +83,83 @@ impl Index {
             ))
         }
     }
+
+    /// Serialize the IVF-Flat index to a file
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - Path to the file where the index will be saved
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use cuvs::ivf_flat::{Index, IndexParams};
+    /// # use cuvs::resources::Resources;
+    /// # let res = Resources::new().unwrap();
+    /// # let params = IndexParams::new().unwrap();
+    /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
+    /// # let index = Index::build(&res, &params, &dataset).unwrap();
+    /// index.serialize(&res, "index.bin").unwrap();
+    /// ```
+    pub fn serialize(
+        &self,
+        res: &Resources,
+        filename: impl AsRef<std::path::Path>,
+    ) -> Result<()> {
+        use std::ffi::CString;
+        let filename = CString::new(
+            filename
+                .as_ref()
+                .to_str()
+                .ok_or_else(|| crate::error::Error::new("Invalid filename"))?,
+        )
+        .map_err(|_| crate::error::Error::new("Invalid filename with null bytes"))?;
+
+        unsafe {
+            check_cuvs(ffi::cuvsIvfFlatSerialize(
+                res.0,
+                filename.as_ptr(),
+                self.0,
+            ))
+        }
+    }
+
+    /// Deserialize an IVF-Flat index from a file
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `filename` - Path to the file containing the serialized index
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use cuvs::ivf_flat::Index;
+    /// # use cuvs::resources::Resources;
+    /// # let res = Resources::new().unwrap();
+    /// let index = Index::deserialize(&res, "index.bin").unwrap();
+    /// ```
+    pub fn deserialize(res: &Resources, filename: impl AsRef<std::path::Path>) -> Result<Index> {
+        use std::ffi::CString;
+        let filename = CString::new(
+            filename
+                .as_ref()
+                .to_str()
+                .ok_or_else(|| crate::error::Error::new("Invalid filename"))?,
+        )
+        .map_err(|_| crate::error::Error::new("Invalid filename with null bytes"))?;
+
+        let index = Index::new()?;
+        unsafe {
+            check_cuvs(ffi::cuvsIvfFlatDeserialize(
+                res.0,
+                filename.as_ptr(),
+                index.0,
+            ))?;
+        }
+        Ok(index)
+    }
 }
 
 impl Drop for Index {
