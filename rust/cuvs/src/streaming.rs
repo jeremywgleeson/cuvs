@@ -90,26 +90,6 @@
 //! index.stream_serialize(&res, &mut buffer, CagraSerializeOptions { include_dataset: true }).unwrap();
 //! println!("Serialized {} bytes", buffer.len());
 //! ```
-//!
-//! ## Stream from S3 (hypothetical example with aws-sdk)
-//!
-//! ```ignore
-//! use aws_sdk_s3::primitives::ByteStream;
-//! use cuvs::streaming::StreamSerialize;
-//! use cuvs::cagra::Index;
-//!
-//! // Download from S3 as a stream
-//! let s3_client = aws_sdk_s3::Client::new(&config);
-//! let object = s3_client
-//!     .get_object()
-//!     .bucket("my-bucket")
-//!     .key("index.bin")
-//!     .send()
-//!     .await?;
-//!
-//! let stream = object.body.into_async_read();
-//! let index = Index::stream_deserialize(&res, stream)?;
-//! ```
 
 use crate::error::Result;
 use crate::resources::Resources;
