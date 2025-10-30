@@ -13,6 +13,12 @@
 //! - Streaming over network connections
 //! - Avoiding disk space requirements for temporary files
 //!
+//! # Supported Index Types
+//!
+//! - **CAGRA**: `serialize()` / `deserialize()`
+//! - **IVF-Flat**: `serialize_ivf_flat()` / `deserialize_ivf_flat()`
+//! - **IVF-PQ**: `serialize_ivf_pq()` / `deserialize_ivf_pq()`
+//!
 //! # Platform-Specific Behavior
 //!
 //! - **Unix/Linux/macOS**: Uses named pipes (FIFOs) for true zero-copy streaming
@@ -405,6 +411,298 @@ pub fn deserialize<R: Read>(
     // Clean up temp file
     let _ = fs::remove_file(&temp_path);
 
+    result
+}
+
+/// Serialize an IVF-Flat index to a writer without buffering the entire index in memory
+///
+/// # Arguments
+///
+/// * `res` - CUDA resources handle
+/// * `index` - The IVF-Flat index to serialize
+/// * `writer` - Destination writer (file, network socket, compression stream, etc.)
+#[cfg(unix)]
+pub fn serialize_ivf_flat<W: Write + Send + 'static>(
+    res: &crate::resources::Resources,
+    index: &crate::ivf_flat::Index,
+    mut writer: W,
+) -> Result<()> {
+    use std::fs;
+    use std::thread;
+
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
+    let pipe_path_clone = pipe_path.clone();
+
+    let c_path = std::ffi::CString::new(
+        pipe_path
+            .to_str()
+            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    )
+    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+
+    unsafe {
+        if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
+            return Err(crate::error::Error::new(&format!(
+                "Failed to create named pipe: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+    }
+
+    let reader_thread = thread::spawn(move || -> Result<()> {
+        let mut reader = fs::File::open(&pipe_path_clone)?;
+        std::io::copy(&mut reader, &mut writer)
+            .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+        Ok(())
+    });
+
+    let result = index.serialize(res, &pipe_path);
+    let reader_result = reader_thread
+        .join()
+        .map_err(|_| crate::error::Error::new("Reader thread panicked"))?;
+
+    let _ = fs::remove_file(&pipe_path);
+
+    result?;
+    reader_result?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn serialize_ivf_flat<W: Write>(
+    res: &crate::resources::Resources,
+    index: &crate::ivf_flat::Index,
+    mut writer: W,
+) -> Result<()> {
+    use std::fs;
+    use std::io::BufReader;
+
+    let temp_path = std::env::temp_dir().join(generate_random_name());
+    index.serialize(res, &temp_path)?;
+
+    let file = fs::File::open(&temp_path)?;
+    let mut reader = BufReader::new(file);
+    std::io::copy(&mut reader, &mut writer)
+        .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+
+    let _ = fs::remove_file(&temp_path);
+    Ok(())
+}
+
+/// Deserialize an IVF-Flat index from a reader without buffering the entire index in memory
+///
+/// # Arguments
+///
+/// * `res` - CUDA resources handle
+/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
+#[cfg(unix)]
+pub fn deserialize_ivf_flat<R: Read + Send + 'static>(
+    res: &crate::resources::Resources,
+    mut reader: R,
+) -> Result<crate::ivf_flat::Index> {
+    use std::fs;
+    use std::thread;
+
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
+    let pipe_path_clone = pipe_path.clone();
+
+    let c_path = std::ffi::CString::new(
+        pipe_path
+            .to_str()
+            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    )
+    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+
+    unsafe {
+        if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
+            return Err(crate::error::Error::new(&format!(
+                "Failed to create named pipe: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+    }
+
+    let writer_thread = thread::spawn(move || -> Result<()> {
+        let mut writer = fs::File::create(&pipe_path_clone)?;
+        std::io::copy(&mut reader, &mut writer)
+            .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+        Ok(())
+    });
+
+    let result = crate::ivf_flat::Index::deserialize(res, &pipe_path);
+    let writer_result = writer_thread
+        .join()
+        .map_err(|_| crate::error::Error::new("Writer thread panicked"))?;
+
+    let _ = fs::remove_file(&pipe_path);
+
+    writer_result?;
+    result
+}
+
+#[cfg(not(unix))]
+pub fn deserialize_ivf_flat<R: Read>(
+    res: &crate::resources::Resources,
+    mut reader: R,
+) -> Result<crate::ivf_flat::Index> {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_path = std::env::temp_dir().join(generate_random_name());
+    let mut temp_file = fs::File::create(&temp_path)?;
+    std::io::copy(&mut reader, &mut temp_file)
+        .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+    temp_file.flush()?;
+    drop(temp_file);
+
+    let result = crate::ivf_flat::Index::deserialize(res, &temp_path);
+    let _ = fs::remove_file(&temp_path);
+    result
+}
+
+/// Serialize an IVF-PQ index to a writer without buffering the entire index in memory
+///
+/// # Arguments
+///
+/// * `res` - CUDA resources handle
+/// * `index` - The IVF-PQ index to serialize
+/// * `writer` - Destination writer (file, network socket, compression stream, etc.)
+#[cfg(unix)]
+pub fn serialize_ivf_pq<W: Write + Send + 'static>(
+    res: &crate::resources::Resources,
+    index: &crate::ivf_pq::Index,
+    mut writer: W,
+) -> Result<()> {
+    use std::fs;
+    use std::thread;
+
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
+    let pipe_path_clone = pipe_path.clone();
+
+    let c_path = std::ffi::CString::new(
+        pipe_path
+            .to_str()
+            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    )
+    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+
+    unsafe {
+        if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
+            return Err(crate::error::Error::new(&format!(
+                "Failed to create named pipe: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+    }
+
+    let reader_thread = thread::spawn(move || -> Result<()> {
+        let mut reader = fs::File::open(&pipe_path_clone)?;
+        std::io::copy(&mut reader, &mut writer)
+            .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+        Ok(())
+    });
+
+    let result = index.serialize(res, &pipe_path);
+    let reader_result = reader_thread
+        .join()
+        .map_err(|_| crate::error::Error::new("Reader thread panicked"))?;
+
+    let _ = fs::remove_file(&pipe_path);
+
+    result?;
+    reader_result?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn serialize_ivf_pq<W: Write>(
+    res: &crate::resources::Resources,
+    index: &crate::ivf_pq::Index,
+    mut writer: W,
+) -> Result<()> {
+    use std::fs;
+    use std::io::BufReader;
+
+    let temp_path = std::env::temp_dir().join(generate_random_name());
+    index.serialize(res, &temp_path)?;
+
+    let file = fs::File::open(&temp_path)?;
+    let mut reader = BufReader::new(file);
+    std::io::copy(&mut reader, &mut writer)
+        .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+
+    let _ = fs::remove_file(&temp_path);
+    Ok(())
+}
+
+/// Deserialize an IVF-PQ index from a reader without buffering the entire index in memory
+///
+/// # Arguments
+///
+/// * `res` - CUDA resources handle
+/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
+#[cfg(unix)]
+pub fn deserialize_ivf_pq<R: Read + Send + 'static>(
+    res: &crate::resources::Resources,
+    mut reader: R,
+) -> Result<crate::ivf_pq::Index> {
+    use std::fs;
+    use std::thread;
+
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
+    let pipe_path_clone = pipe_path.clone();
+
+    let c_path = std::ffi::CString::new(
+        pipe_path
+            .to_str()
+            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    )
+    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+
+    unsafe {
+        if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
+            return Err(crate::error::Error::new(&format!(
+                "Failed to create named pipe: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+    }
+
+    let writer_thread = thread::spawn(move || -> Result<()> {
+        let mut writer = fs::File::create(&pipe_path_clone)?;
+        std::io::copy(&mut reader, &mut writer)
+            .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+        Ok(())
+    });
+
+    let result = crate::ivf_pq::Index::deserialize(res, &pipe_path);
+    let writer_result = writer_thread
+        .join()
+        .map_err(|_| crate::error::Error::new("Writer thread panicked"))?;
+
+    let _ = fs::remove_file(&pipe_path);
+
+    writer_result?;
+    result
+}
+
+#[cfg(not(unix))]
+pub fn deserialize_ivf_pq<R: Read>(
+    res: &crate::resources::Resources,
+    mut reader: R,
+) -> Result<crate::ivf_pq::Index> {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_path = std::env::temp_dir().join(generate_random_name());
+    let mut temp_file = fs::File::create(&temp_path)?;
+    std::io::copy(&mut reader, &mut temp_file)
+        .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
+    temp_file.flush()?;
+    drop(temp_file);
+
+    let result = crate::ivf_pq::Index::deserialize(res, &temp_path);
+    let _ = fs::remove_file(&temp_path);
     result
 }
 
