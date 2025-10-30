@@ -290,7 +290,7 @@ fn stream_serialize_impl<T, W>(
 ) -> Result<()>
 where
     T: FileSerialize,
-    W: Write,
+    W: Write + Send + 'static,
 {
     use std::fs;
     use std::io::BufReader;
@@ -359,7 +359,7 @@ where
 fn stream_deserialize_impl<T, R>(res: &Resources, mut reader: R) -> Result<T>
 where
     T: FileDeserialize,
-    R: Read,
+    R: Read + Send + 'static,
 {
     use std::fs;
     use std::io::Write;
