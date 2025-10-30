@@ -79,6 +79,26 @@
 use crate::error::Result;
 use std::io::{Read, Write};
 
+/// Generate a cryptographically secure random filename component
+fn generate_random_name() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hash, Hasher};
+
+    let random_state = RandomState::new();
+    let mut hasher = random_state.build_hasher();
+
+    // Hash multiple sources of entropy
+    std::process::id().hash(&mut hasher);
+    std::thread::current().id().hash(&mut hasher);
+
+    // Use current time as additional entropy
+    if let Ok(duration) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        duration.as_nanos().hash(&mut hasher);
+    }
+
+    format!("cuvs_{:016x}", hasher.finish())
+}
+
 /// Serialize a CAGRA index to a writer without buffering the entire index in memory
 ///
 /// This function enables streaming large indices to any destination that implements
@@ -163,11 +183,12 @@ pub fn serialize<W: Write + Send + 'static>(
     use std::fs;
     use std::thread;
 
-    // Create a unique named pipe in temp directory
-    let pipe_path = std::env::temp_dir().join(format!("cuvs_pipe_{}", std::process::id()));
+    // Create a unique named pipe in temp directory with secure random name
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
     let pipe_path_clone = pipe_path.clone();
 
     // Create the named pipe (mode 0o600 = owner read/write only)
+    // mkfifo will fail if the path already exists, providing TOCTOU protection
     let c_path = std::ffi::CString::new(
         pipe_path
             .to_str()
@@ -221,11 +242,8 @@ pub fn serialize<W: Write>(
     use std::fs;
     use std::io::BufReader;
 
-    // Use temp file as fallback
-    let temp_path = std::env::temp_dir().join(format!(
-        "cuvs_serialize_temp_{}",
-        std::process::id()
-    ));
+    // Use temp file as fallback with secure random name
+    let temp_path = std::env::temp_dir().join(generate_random_name());
 
     // Serialize to temp file
     index.serialize(res, &temp_path, include_dataset)?;
@@ -316,11 +334,12 @@ pub fn deserialize<R: Read + Send + 'static>(
     use std::fs;
     use std::thread;
 
-    // Create a unique named pipe in temp directory
-    let pipe_path = std::env::temp_dir().join(format!("cuvs_pipe_{}", std::process::id()));
+    // Create a unique named pipe in temp directory with secure random name
+    let pipe_path = std::env::temp_dir().join(generate_random_name());
     let pipe_path_clone = pipe_path.clone();
 
     // Create the named pipe (mode 0o600 = owner read/write only)
+    // mkfifo will fail if the path already exists, providing TOCTOU protection
     let c_path = std::ffi::CString::new(
         pipe_path
             .to_str()
@@ -370,11 +389,8 @@ pub fn deserialize<R: Read>(
     use std::fs;
     use std::io::Write;
 
-    // Use temp file as fallback
-    let temp_path = std::env::temp_dir().join(format!(
-        "cuvs_deserialize_temp_{}",
-        std::process::id()
-    ));
+    // Use temp file as fallback with secure random name
+    let temp_path = std::env::temp_dir().join(generate_random_name());
 
     // Copy from reader to temp file
     let mut temp_file = fs::File::create(&temp_path)?;
@@ -507,21 +523,39 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_named_pipe_cleanup() {
-        use std::path::PathBuf;
-
         let res = Resources::new().unwrap();
         let (index, _dataset) = build_test_index(&res);
 
         let mut buffer = Vec::new();
 
-        // Check that pipe doesn't exist before
-        let pipe_path = std::env::temp_dir().join(format!("cuvs_pipe_{}", std::process::id()));
-        assert!(!pipe_path.exists());
+        // Count cuvs temp files before
+        let temp_dir = std::env::temp_dir();
+        let before_count = std::fs::read_dir(&temp_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .map(|s| s.starts_with("cuvs_"))
+                    .unwrap_or(false)
+            })
+            .count();
 
         // Serialize
         serialize(&res, &index, &mut buffer, true).unwrap();
 
-        // Check that pipe was cleaned up
-        assert!(!pipe_path.exists());
+        // Verify no new cuvs temp files remain (all cleaned up)
+        let after_count = std::fs::read_dir(&temp_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .map(|s| s.starts_with("cuvs_"))
+                    .unwrap_or(false)
+            })
+            .count();
+
+        assert_eq!(before_count, after_count, "Temporary pipe was not cleaned up");
     }
 }
