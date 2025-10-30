@@ -86,43 +86,14 @@ impl Index {
 
     /// Serialize the CAGRA index to a file
     ///
-    /// Saves the index to disk for later reuse. This is useful for:
-    /// - Persisting expensive-to-build indices
-    /// - Sharing indices between processes or machines
-    /// - Reducing startup time by loading pre-built indices
-    ///
     /// # Arguments
     ///
     /// * `res` - Resources to use
     /// * `filename` - Path to the file where the index will be saved
     /// * `include_dataset` - Whether to include the dataset vectors in the serialized output.
-    ///   Set to `true` if you need the original vectors, `false` to save space.
+    ///   Set to `true` if you need the original vectors, `false` to save space (smaller file).
     ///
-    /// # Performance
-    ///
-    /// Serialization writes incrementally to disk, so memory usage is bounded.
-    /// For a 10M vector index with 128 dimensions:
-    /// - With dataset: ~5-10 GB file size
-    /// - Without dataset: ~100-500 MB file size (only graph structure)
-    ///
-    /// # Examples
-    ///
-    /// ## Basic usage
-    ///
-    /// ```no_run
-    /// use cuvs::cagra::{Index, IndexParams};
-    /// use cuvs::resources::Resources;
-    /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
-    ///
-    /// let res = Resources::new().unwrap();
-    /// let params = IndexParams::new().unwrap();
-    /// let index = Index::build(&res, &params, &dataset).unwrap();
-    ///
-    /// // Save with dataset for complete index
-    /// index.serialize(&res, "my_index.bin", true).unwrap();
-    /// ```
-    ///
-    /// ## Save without dataset to reduce file size
+    /// # Example
     ///
     /// ```no_run
     /// # use cuvs::cagra::{Index, IndexParams};
@@ -131,31 +102,10 @@ impl Index {
     /// # let params = IndexParams::new().unwrap();
     /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
     /// # let index = Index::build(&res, &params, &dataset).unwrap();
-    ///
-    /// // Save only graph structure (smaller file)
-    /// index.serialize(&res, "graph_only.bin", false).unwrap();
+    /// index.serialize(&res, "index.bin", true).unwrap();
     /// ```
     ///
-    /// ## For streaming serialization, see [`crate::streaming`]
-    ///
-    /// ```no_run
-    /// use cuvs::streaming;
-    /// # use cuvs::cagra::{Index, IndexParams};
-    /// # use cuvs::resources::Resources;
-    /// # let res = Resources::new().unwrap();
-    /// # let params = IndexParams::new().unwrap();
-    /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
-    /// # let index = Index::build(&res, &params, &dataset).unwrap();
-    /// use std::fs::File;
-    ///
-    /// // Stream to compressed file
-    /// use flate2::write::GzEncoder;
-    /// use flate2::Compression;
-    ///
-    /// let file = File::create("index.bin.gz").unwrap();
-    /// let encoder = GzEncoder::new(file, Compression::default());
-    /// streaming::serialize_to_writer(&res, &index, encoder, true).unwrap();
-    /// ```
+    /// For streaming serialization (compression, S3, etc.), see [`crate::streaming`] module.
     pub fn serialize(
         &self,
         res: &Resources,
@@ -183,76 +133,21 @@ impl Index {
 
     /// Deserialize a CAGRA index from a file
     ///
-    /// Loads a previously saved index from disk. The loaded index is immediately
-    /// ready for searching without any additional build steps.
-    ///
     /// # Arguments
     ///
-    /// * `res` - Resources to use (must match the GPU where index will be used)
+    /// * `res` - Resources to use
     /// * `filename` - Path to the file containing the serialized index
     ///
-    /// # Returns
-    ///
-    /// A fully constructed index ready for searching
-    ///
-    /// # Performance
-    ///
-    /// Loading is I/O bound. For large indices (>1GB), consider:
-    /// - Using fast storage (NVMe SSD)
-    /// - Streaming from compressed files (see [`crate::streaming`])
-    /// - Pre-loading indices at application startup
-    ///
-    /// # Examples
-    ///
-    /// ## Basic usage
+    /// # Example
     ///
     /// ```no_run
-    /// use cuvs::cagra::Index;
-    /// use cuvs::resources::Resources;
-    ///
-    /// let res = Resources::new().unwrap();
-    /// let index = Index::deserialize(&res, "my_index.bin").unwrap();
-    ///
-    /// // Index is ready to use immediately
-    /// // ... perform searches ...
-    /// ```
-    ///
-    /// ## Load and search
-    ///
-    /// ```no_run
-    /// use cuvs::cagra::{Index, SearchParams};
-    /// use cuvs::{Resources, ManagedTensor};
-    /// # let queries = ndarray::Array::<f32, _>::zeros((10, 128));
-    ///
-    /// let res = Resources::new().unwrap();
+    /// # use cuvs::cagra::Index;
+    /// # use cuvs::resources::Resources;
+    /// # let res = Resources::new().unwrap();
     /// let index = Index::deserialize(&res, "index.bin").unwrap();
-    ///
-    /// // Perform search
-    /// let search_params = SearchParams::new().unwrap();
-    /// let queries_device = ManagedTensor::from(&queries).to_device(&res).unwrap();
-    /// let mut neighbors = ndarray::Array::<u32, _>::zeros((10, 10));
-    /// let neighbors_device = ManagedTensor::from(&neighbors).to_device(&res).unwrap();
-    /// let mut distances = ndarray::Array::<f32, _>::zeros((10, 10));
-    /// let distances_device = ManagedTensor::from(&distances).to_device(&res).unwrap();
-    ///
-    /// index.search(&res, &search_params, &queries_device, &neighbors_device, &distances_device).unwrap();
     /// ```
     ///
-    /// ## For streaming deserialization, see [`crate::streaming`]
-    ///
-    /// ```no_run
-    /// use cuvs::streaming;
-    /// use cuvs::resources::Resources;
-    /// use std::fs::File;
-    /// use flate2::read::GzDecoder;
-    ///
-    /// let res = Resources::new().unwrap();
-    ///
-    /// // Load from compressed file
-    /// let file = File::open("index.bin.gz").unwrap();
-    /// let decoder = GzDecoder::new(file);
-    /// let index = streaming::deserialize_from_reader(&res, decoder).unwrap();
-    /// ```
+    /// For streaming deserialization (compression, S3, etc.), see [`crate::streaming`] module.
     pub fn deserialize(res: &Resources, filename: impl AsRef<std::path::Path>) -> Result<Index> {
         use std::ffi::CString;
         let filename = CString::new(

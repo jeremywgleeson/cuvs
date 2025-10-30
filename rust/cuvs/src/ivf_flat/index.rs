@@ -102,6 +102,8 @@ impl Index {
     /// # let index = Index::build(&res, &params, &dataset).unwrap();
     /// index.serialize(&res, "index.bin").unwrap();
     /// ```
+    ///
+    /// For streaming serialization (compression, S3, etc.), see [`crate::streaming`] module.
     pub fn serialize(
         &self,
         res: &Resources,
@@ -140,6 +142,8 @@ impl Index {
     /// # let res = Resources::new().unwrap();
     /// let index = Index::deserialize(&res, "index.bin").unwrap();
     /// ```
+    ///
+    /// For streaming deserialization (compression, S3, etc.), see [`crate::streaming`] module.
     pub fn deserialize(res: &Resources, filename: impl AsRef<std::path::Path>) -> Result<Index> {
         use std::ffi::CString;
         let filename = CString::new(
