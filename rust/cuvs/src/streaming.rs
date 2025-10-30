@@ -15,6 +15,12 @@
 //!
 //! # Supported Index Types
 //!
+//! All index types implement the [`StreamSerialize`] trait for generic usage:
+//! - **CAGRA**: Options = `bool` (include_dataset)
+//! - **IVF-Flat**: Options = `()`
+//! - **IVF-PQ**: Options = `()`
+//!
+//! Convenience functions are also available:
 //! - **CAGRA**: `serialize()` / `deserialize()`
 //! - **IVF-Flat**: `serialize_ivf_flat()` / `deserialize_ivf_flat()`
 //! - **IVF-PQ**: `serialize_ivf_pq()` / `deserialize_ivf_pq()`
@@ -26,7 +32,28 @@
 //!
 //! # Examples
 //!
-//! ## Stream to a compressed file
+//! ## Generic trait-based usage
+//!
+//! ```no_run
+//! use cuvs::streaming::StreamSerialize;
+//! use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::resources::Resources;
+//! use std::fs::File;
+//! use flate2::write::GzEncoder;
+//! use flate2::Compression;
+//!
+//! let res = Resources::new().unwrap();
+//! let params = IndexParams::new().unwrap();
+//! # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
+//! let index = Index::build(&res, &params, &dataset).unwrap();
+//!
+//! // Use trait method - works with any index type
+//! let file = File::create("index.bin.gz").unwrap();
+//! let encoder = GzEncoder::new(file, Compression::default());
+//! index.stream_serialize(&res, encoder, true).unwrap();
+//! ```
+//!
+//! ## Convenience function usage
 //!
 //! ```no_run
 //! use cuvs::streaming;
@@ -41,7 +68,7 @@
 //! # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
 //! let index = Index::build(&res, &params, &dataset).unwrap();
 //!
-//! // Stream directly to compressed file
+//! // Use convenience function
 //! let file = File::create("index.bin.gz").unwrap();
 //! let encoder = GzEncoder::new(file, Compression::default());
 //! streaming::serialize(&res, &index, encoder, true).unwrap();
@@ -83,7 +110,39 @@
 //! ```
 
 use crate::error::Result;
+use crate::resources::Resources;
 use std::io::{Read, Write};
+
+/// Trait for indices that support streaming serialization/deserialization
+///
+/// This trait provides a generic interface for streaming indices to/from
+/// any `Read`/`Write` implementation without buffering in memory.
+pub trait StreamSerialize: Sized {
+    /// Options type for serialization (e.g., `bool` for include_dataset, `()` for no options)
+    type SerializeOptions;
+
+    /// Serialize index to a writer without buffering entire index in memory
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - CUDA resources handle
+    /// * `writer` - Destination writer (file, network socket, compression stream, etc.)
+    /// * `options` - Index-specific serialization options
+    fn stream_serialize<W: Write + Send + 'static>(
+        &self,
+        res: &Resources,
+        writer: W,
+        options: Self::SerializeOptions,
+    ) -> Result<()>;
+
+    /// Deserialize index from a reader without buffering entire index in memory
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - CUDA resources handle
+    /// * `reader` - Source reader (file, network socket, decompression stream, etc.)
+    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self>;
+}
 
 /// Generate a cryptographically secure random filename component
 fn generate_random_name() -> String {
@@ -706,6 +765,70 @@ pub fn deserialize_ivf_pq<R: Read>(
     result
 }
 
+// =============================================================================
+// Trait Implementations
+// =============================================================================
+
+/// CAGRA index streaming implementation
+///
+/// Uses `bool` for SerializeOptions to control whether dataset is included.
+impl StreamSerialize for crate::cagra::Index {
+    type SerializeOptions = bool;
+
+    fn stream_serialize<W: Write + Send + 'static>(
+        &self,
+        res: &Resources,
+        writer: W,
+        include_dataset: bool,
+    ) -> Result<()> {
+        serialize(res, self, writer, include_dataset)
+    }
+
+    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
+        deserialize(res, reader)
+    }
+}
+
+/// IVF-Flat index streaming implementation
+///
+/// Uses `()` for SerializeOptions since it has no serialization options.
+impl StreamSerialize for crate::ivf_flat::Index {
+    type SerializeOptions = ();
+
+    fn stream_serialize<W: Write + Send + 'static>(
+        &self,
+        res: &Resources,
+        writer: W,
+        _options: (),
+    ) -> Result<()> {
+        serialize_ivf_flat(res, self, writer)
+    }
+
+    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
+        deserialize_ivf_flat(res, reader)
+    }
+}
+
+/// IVF-PQ index streaming implementation
+///
+/// Uses `()` for SerializeOptions since it has no serialization options.
+impl StreamSerialize for crate::ivf_pq::Index {
+    type SerializeOptions = ();
+
+    fn stream_serialize<W: Write + Send + 'static>(
+        &self,
+        res: &Resources,
+        writer: W,
+        _options: (),
+    ) -> Result<()> {
+        serialize_ivf_pq(res, self, writer)
+    }
+
+    fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
+        deserialize_ivf_pq(res, reader)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -816,6 +939,27 @@ mod tests {
 
         // First 4 bytes should be the dtype signature
         assert_eq!(buffer.len() >= 4, true);
+    }
+
+    #[test]
+    fn test_generic_trait_usage() {
+        // Test that the trait allows generic functions
+        fn serialize_any_index<I: StreamSerialize>(
+            res: &Resources,
+            index: &I,
+            options: I::SerializeOptions,
+        ) -> Vec<u8> {
+            let mut buffer = Vec::new();
+            index.stream_serialize(res, &mut buffer, options).unwrap();
+            buffer
+        }
+
+        let res = Resources::new().unwrap();
+        let (cagra_index, _) = build_test_index(&res);
+
+        // Serialize using generic function
+        let buffer = serialize_any_index(&res, &cagra_index, true);
+        assert!(!buffer.is_empty());
     }
 
     #[cfg(unix)]
