@@ -20,11 +20,6 @@
 //! - **IVF-Flat**: Options = `()`
 //! - **IVF-PQ**: Options = `()`
 //!
-//! Convenience functions are also available:
-//! - **CAGRA**: `serialize()` / `deserialize()`
-//! - **IVF-Flat**: `serialize_ivf_flat()` / `deserialize_ivf_flat()`
-//! - **IVF-PQ**: `serialize_ivf_pq()` / `deserialize_ivf_pq()`
-//!
 //! # Platform-Specific Behavior
 //!
 //! - **Unix/Linux/macOS**: Uses named pipes (FIFOs) for true zero-copy streaming
@@ -53,25 +48,32 @@
 //! index.stream_serialize(&res, encoder, true).unwrap();
 //! ```
 //!
-//! ## Convenience function usage
+//! ## Generic function usage
 //!
 //! ```no_run
 //! use cuvs::streaming;
-//! use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::cagra::Index;
+//! # use cuvs::cagra::IndexParams;
 //! use cuvs::resources::Resources;
 //! use std::fs::File;
 //! use flate2::write::GzEncoder;
+//! use flate2::read::GzDecoder;
 //! use flate2::Compression;
 //!
 //! let res = Resources::new().unwrap();
-//! let params = IndexParams::new().unwrap();
+//! # let params = IndexParams::new().unwrap();
 //! # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
-//! let index = Index::build(&res, &params, &dataset).unwrap();
+//! # let index = Index::build(&res, &params, &dataset).unwrap();
 //!
-//! // Use convenience function
+//! // Serialize with generic function
 //! let file = File::create("index.bin.gz").unwrap();
 //! let encoder = GzEncoder::new(file, Compression::default());
 //! streaming::serialize(&res, &index, encoder, true).unwrap();
+//!
+//! // Deserialize with type annotation
+//! let file = File::open("index.bin.gz").unwrap();
+//! let decoder = GzDecoder::new(file);
+//! let loaded: Index = streaming::deserialize(&res, decoder).unwrap();
 //! ```
 //!
 //! ## Stream to a Vec (in-memory buffer)
@@ -164,83 +166,102 @@ fn generate_random_name() -> String {
     format!("cuvs_{:016x}", hasher.finish())
 }
 
-/// Serialize a CAGRA index to a writer without buffering the entire index in memory
+// =============================================================================
+// Public Generic API
+// =============================================================================
+
+/// Serialize any index to a writer without buffering the entire index in memory
 ///
-/// This function enables streaming large indices to any destination that implements
-/// [`std::io::Write`]. On Unix systems, it uses named pipes for true streaming without
-/// temporary files. On other platforms, it falls back to using a temporary file.
+/// This generic function works with any index type that implements [`StreamSerialize`].
 ///
 /// # Arguments
 ///
 /// * `res` - CUDA resources handle
-/// * `index` - The CAGRA index to serialize
+/// * `index` - The index to serialize
 /// * `writer` - Destination writer (file, network socket, compression stream, etc.)
-/// * `include_dataset` - Whether to include the dataset vectors in the serialized output
-///
-/// # Performance Notes
-///
-/// - **Unix/Linux/macOS**: No intermediate buffering, direct streaming from GPU
-/// - **Windows**: Uses a temporary file, requires disk space equal to serialized size
-/// - The writer should be buffered for best performance (e.g., `BufWriter`)
+/// * `options` - Index-specific serialization options
 ///
 /// # Examples
-///
-/// ## Basic file streaming
 ///
 /// ```no_run
 /// use cuvs::streaming;
 /// use cuvs::cagra::{Index, IndexParams};
 /// use cuvs::resources::Resources;
-/// use std::fs::File;
-/// use std::io::BufWriter;
 ///
 /// # let res = Resources::new().unwrap();
 /// # let params = IndexParams::new().unwrap();
 /// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
 /// let index = Index::build(&res, &params, &dataset).unwrap();
 ///
-/// let file = File::create("index.bin").unwrap();
-/// let writer = BufWriter::new(file);
-/// streaming::serialize(&res, &index, writer, true).unwrap();
-/// ```
-///
-/// ## Stream with compression
-///
-/// ```no_run
-/// use cuvs::streaming;
-/// # use cuvs::cagra::{Index, IndexParams};
-/// # use cuvs::resources::Resources;
-/// use std::fs::File;
-/// use flate2::write::GzEncoder;
-/// use flate2::Compression;
-///
-/// # let res = Resources::new().unwrap();
-/// # let params = IndexParams::new().unwrap();
-/// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
-/// # let index = Index::build(&res, &params, &dataset).unwrap();
-///
-/// let file = File::create("index.bin.gz").unwrap();
-/// let encoder = GzEncoder::new(file, Compression::default());
-/// streaming::serialize(&res, &index, encoder, true).unwrap();
-/// ```
-///
-/// ## Stream to memory
-///
-/// ```no_run
-/// use cuvs::streaming;
-/// # use cuvs::cagra::{Index, IndexParams};
-/// # use cuvs::resources::Resources;
-/// # let res = Resources::new().unwrap();
-/// # let params = IndexParams::new().unwrap();
-/// # let dataset = ndarray::Array::<f32, _>::zeros((100, 10));
-/// # let index = Index::build(&res, &params, &dataset).unwrap();
-///
 /// let mut buffer = Vec::new();
 /// streaming::serialize(&res, &index, &mut buffer, true).unwrap();
 /// ```
+pub fn serialize<I, W>(
+    res: &Resources,
+    index: &I,
+    writer: W,
+    options: I::SerializeOptions,
+) -> Result<()>
+where
+    I: StreamSerialize,
+    W: Write + Send + 'static,
+{
+    index.stream_serialize(res, writer, options)
+}
+
+/// Deserialize any index from a reader without buffering the entire index in memory
+///
+/// This generic function works with any index type that implements [`StreamSerialize`].
+/// The index type must be specified either through type annotation or turbofish syntax.
+///
+/// # Arguments
+///
+/// * `res` - CUDA resources handle
+/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
+///
+/// # Examples
+///
+/// ## With type annotation
+///
+/// ```no_run
+/// use cuvs::streaming;
+/// use cuvs::cagra::Index;
+/// use cuvs::resources::Resources;
+///
+/// # let res = Resources::new().unwrap();
+/// # let buffer = vec![0u8; 100];
+/// let index: Index = streaming::deserialize(&res, &buffer[..]).unwrap();
+/// ```
+///
+/// ## With turbofish syntax
+///
+/// ```no_run
+/// use cuvs::streaming;
+/// use cuvs::cagra::Index;
+/// use cuvs::resources::Resources;
+///
+/// # let res = Resources::new().unwrap();
+/// # let buffer = vec![0u8; 100];
+/// let index = streaming::deserialize::<Index, _>(&res, &buffer[..]).unwrap();
+/// ```
+pub fn deserialize<I, R>(res: &Resources, reader: R) -> Result<I>
+where
+    I: StreamSerialize,
+    R: Read + Send + 'static,
+{
+    I::stream_deserialize(res, reader)
+}
+
+// =============================================================================
+// Private Implementation Helpers
+// =============================================================================
+
+/// Serialize a CAGRA index to a writer without buffering the entire index in memory
+///
+/// This is a private helper function. Use the public `serialize()` function instead.
 #[cfg(unix)]
-pub fn serialize<W: Write + Send + 'static>(
-    res: &crate::resources::Resources,
+fn serialize_cagra<W: Write + Send + 'static>(
+    res: &Resources,
     index: &crate::cagra::Index,
     mut writer: W,
     include_dataset: bool,
@@ -248,12 +269,9 @@ pub fn serialize<W: Write + Send + 'static>(
     use std::fs;
     use std::thread;
 
-    // Create a unique named pipe in temp directory with secure random name
     let pipe_path = std::env::temp_dir().join(generate_random_name());
     let pipe_path_clone = pipe_path.clone();
 
-    // Create the named pipe (mode 0o600 = owner read/write only)
-    // mkfifo will fail if the path already exists, providing TOCTOU protection
     let c_path = std::ffi::CString::new(
         pipe_path
             .to_str()
@@ -270,7 +288,6 @@ pub fn serialize<W: Write + Send + 'static>(
         }
     }
 
-    // Spawn thread to read from pipe and write to destination
     let reader_thread = thread::spawn(move || -> Result<()> {
         let mut reader = fs::File::open(&pipe_path_clone)?;
         std::io::copy(&mut reader, &mut writer)
@@ -278,28 +295,21 @@ pub fn serialize<W: Write + Send + 'static>(
         Ok(())
     });
 
-    // Serialize to the pipe (this blocks until reader consumes data)
     let result = index.serialize(res, &pipe_path, include_dataset);
-
-    // Wait for reader thread to finish
     let reader_result = reader_thread
         .join()
         .map_err(|_| crate::error::Error::new("Reader thread panicked"))?;
 
-    // Clean up the pipe
     let _ = fs::remove_file(&pipe_path);
 
-    // Return first error if any occurred
     result?;
     reader_result?;
-
     Ok(())
 }
 
-/// Fallback implementation using temp file for non-Unix platforms
 #[cfg(not(unix))]
-pub fn serialize<W: Write>(
-    res: &crate::resources::Resources,
+fn serialize_cagra<W: Write>(
+    res: &Resources,
     index: &crate::cagra::Index,
     mut writer: W,
     include_dataset: bool,
@@ -307,104 +317,32 @@ pub fn serialize<W: Write>(
     use std::fs;
     use std::io::BufReader;
 
-    // Use temp file as fallback with secure random name
     let temp_path = std::env::temp_dir().join(generate_random_name());
-
-    // Serialize to temp file
     index.serialize(res, &temp_path, include_dataset)?;
 
-    // Copy to writer
     let file = fs::File::open(&temp_path)?;
     let mut reader = BufReader::new(file);
     std::io::copy(&mut reader, &mut writer)
         .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
 
-    // Clean up temp file
     let _ = fs::remove_file(&temp_path);
-
     Ok(())
 }
 
-/// Deserialize a CAGRA index from a reader without buffering the entire index in memory
+/// Deserialize a CAGRA index from a reader
 ///
-/// This function enables loading large indices from any source that implements
-/// [`std::io::Read`]. On Unix systems, it uses named pipes for true streaming without
-/// temporary files. On other platforms, it falls back to using a temporary file.
-///
-/// # Arguments
-///
-/// * `res` - CUDA resources handle
-/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
-///
-/// # Returns
-///
-/// A deserialized CAGRA index ready for searching
-///
-/// # Performance Notes
-///
-/// - **Unix/Linux/macOS**: No intermediate buffering, direct streaming to GPU
-/// - **Windows**: Uses a temporary file, requires disk space equal to serialized size
-/// - The reader should be buffered for best performance (e.g., `BufReader`)
-///
-/// # Examples
-///
-/// ## Load from file
-///
-/// ```no_run
-/// use cuvs::streaming;
-/// use cuvs::resources::Resources;
-/// use std::fs::File;
-/// use std::io::BufReader;
-///
-/// let res = Resources::new().unwrap();
-///
-/// let file = File::open("index.bin").unwrap();
-/// let reader = BufReader::new(file);
-/// let index = streaming::deserialize(&res, reader).unwrap();
-/// ```
-///
-/// ## Load from compressed file
-///
-/// ```no_run
-/// use cuvs::streaming;
-/// use cuvs::resources::Resources;
-/// use std::fs::File;
-/// use flate2::read::GzDecoder;
-///
-/// let res = Resources::new().unwrap();
-///
-/// let file = File::open("index.bin.gz").unwrap();
-/// let decoder = GzDecoder::new(file);
-/// let index = streaming::deserialize(&res, decoder).unwrap();
-/// ```
-///
-/// ## Load from memory
-///
-/// ```no_run
-/// use cuvs::streaming;
-/// use cuvs::resources::Resources;
-/// use std::io::Cursor;
-///
-/// let res = Resources::new().unwrap();
-/// # let buffer: Vec<u8> = vec![];
-///
-/// let cursor = Cursor::new(buffer);
-/// let index = streaming::deserialize(&res, cursor).unwrap();
-/// ```
+/// This is a private helper. Use the public `deserialize()` function instead.
 #[cfg(unix)]
-pub fn deserialize<R: Read + Send + 'static>(
-    res: &crate::resources::Resources,
+fn deserialize_cagra<R: Read + Send + 'static>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::cagra::Index> {
     use std::fs;
     use std::thread;
 
-    // Create a unique named pipe in temp directory with secure random name
     let pipe_path = std::env::temp_dir().join(generate_random_name());
     let pipe_path_clone = pipe_path.clone();
 
-    // Create the named pipe (mode 0o600 = owner read/write only)
-    // mkfifo will fail if the path already exists, providing TOCTOU protection
     let c_path = std::ffi::CString::new(
         pipe_path
             .to_str()
@@ -421,7 +359,6 @@ pub fn deserialize<R: Read + Send + 'static>(
         }
     }
 
-    // Spawn thread to write to pipe from reader
     let writer_thread = thread::spawn(move || -> Result<()> {
         let mut writer = fs::File::create(&pipe_path_clone)?;
         std::io::copy(&mut reader, &mut writer)
@@ -429,60 +366,41 @@ pub fn deserialize<R: Read + Send + 'static>(
         Ok(())
     });
 
-    // Deserialize from the pipe
     let result = crate::cagra::Index::deserialize(res, &pipe_path);
-
-    // Wait for writer thread to finish
     let writer_result = writer_thread
         .join()
         .map_err(|_| crate::error::Error::new("Writer thread panicked"))?;
 
-    // Clean up the pipe
     let _ = fs::remove_file(&pipe_path);
 
-    // Return first error if any occurred
     writer_result?;
     result
 }
 
-/// Fallback implementation using temp file for non-Unix platforms
 #[cfg(not(unix))]
-pub fn deserialize<R: Read>(
-    res: &crate::resources::Resources,
+fn deserialize_cagra<R: Read>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::cagra::Index> {
     use std::fs;
     use std::io::Write;
 
-    // Use temp file as fallback with secure random name
     let temp_path = std::env::temp_dir().join(generate_random_name());
-
-    // Copy from reader to temp file
     let mut temp_file = fs::File::create(&temp_path)?;
     std::io::copy(&mut reader, &mut temp_file)
         .map_err(|e| crate::error::Error::new(&format!("Failed to copy data: {}", e)))?;
     temp_file.flush()?;
     drop(temp_file);
 
-    // Deserialize from temp file
     let result = crate::cagra::Index::deserialize(res, &temp_path);
-
-    // Clean up temp file
     let _ = fs::remove_file(&temp_path);
-
     result
 }
 
-/// Serialize an IVF-Flat index to a writer without buffering the entire index in memory
-///
-/// # Arguments
-///
-/// * `res` - CUDA resources handle
-/// * `index` - The IVF-Flat index to serialize
-/// * `writer` - Destination writer (file, network socket, compression stream, etc.)
+// IVF-Flat private helpers
 #[cfg(unix)]
-pub fn serialize_ivf_flat<W: Write + Send + 'static>(
-    res: &crate::resources::Resources,
+fn serialize_ivf_flat<W: Write + Send + 'static>(
+    res: &Resources,
     index: &crate::ivf_flat::Index,
     mut writer: W,
 ) -> Result<()> {
@@ -493,11 +411,8 @@ pub fn serialize_ivf_flat<W: Write + Send + 'static>(
     let pipe_path_clone = pipe_path.clone();
 
     let c_path = std::ffi::CString::new(
-        pipe_path
-            .to_str()
-            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
-    )
-    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+        pipe_path.to_str().ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    ).map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
 
     unsafe {
         if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
@@ -516,20 +431,18 @@ pub fn serialize_ivf_flat<W: Write + Send + 'static>(
     });
 
     let result = index.serialize(res, &pipe_path);
-    let reader_result = reader_thread
-        .join()
+    let reader_result = reader_thread.join()
         .map_err(|_| crate::error::Error::new("Reader thread panicked"))?;
 
     let _ = fs::remove_file(&pipe_path);
-
     result?;
     reader_result?;
     Ok(())
 }
 
 #[cfg(not(unix))]
-pub fn serialize_ivf_flat<W: Write>(
-    res: &crate::resources::Resources,
+fn serialize_ivf_flat<W: Write>(
+    res: &Resources,
     index: &crate::ivf_flat::Index,
     mut writer: W,
 ) -> Result<()> {
@@ -548,15 +461,9 @@ pub fn serialize_ivf_flat<W: Write>(
     Ok(())
 }
 
-/// Deserialize an IVF-Flat index from a reader without buffering the entire index in memory
-///
-/// # Arguments
-///
-/// * `res` - CUDA resources handle
-/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
 #[cfg(unix)]
-pub fn deserialize_ivf_flat<R: Read + Send + 'static>(
-    res: &crate::resources::Resources,
+fn deserialize_ivf_flat<R: Read + Send + 'static>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::ivf_flat::Index> {
     use std::fs;
@@ -566,11 +473,8 @@ pub fn deserialize_ivf_flat<R: Read + Send + 'static>(
     let pipe_path_clone = pipe_path.clone();
 
     let c_path = std::ffi::CString::new(
-        pipe_path
-            .to_str()
-            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
-    )
-    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+        pipe_path.to_str().ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    ).map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
 
     unsafe {
         if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
@@ -589,19 +493,17 @@ pub fn deserialize_ivf_flat<R: Read + Send + 'static>(
     });
 
     let result = crate::ivf_flat::Index::deserialize(res, &pipe_path);
-    let writer_result = writer_thread
-        .join()
+    let writer_result = writer_thread.join()
         .map_err(|_| crate::error::Error::new("Writer thread panicked"))?;
 
     let _ = fs::remove_file(&pipe_path);
-
     writer_result?;
     result
 }
 
 #[cfg(not(unix))]
-pub fn deserialize_ivf_flat<R: Read>(
-    res: &crate::resources::Resources,
+fn deserialize_ivf_flat<R: Read>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::ivf_flat::Index> {
     use std::fs;
@@ -619,16 +521,10 @@ pub fn deserialize_ivf_flat<R: Read>(
     result
 }
 
-/// Serialize an IVF-PQ index to a writer without buffering the entire index in memory
-///
-/// # Arguments
-///
-/// * `res` - CUDA resources handle
-/// * `index` - The IVF-PQ index to serialize
-/// * `writer` - Destination writer (file, network socket, compression stream, etc.)
+// IVF-PQ private helpers
 #[cfg(unix)]
-pub fn serialize_ivf_pq<W: Write + Send + 'static>(
-    res: &crate::resources::Resources,
+fn serialize_ivf_pq<W: Write + Send + 'static>(
+    res: &Resources,
     index: &crate::ivf_pq::Index,
     mut writer: W,
 ) -> Result<()> {
@@ -639,11 +535,8 @@ pub fn serialize_ivf_pq<W: Write + Send + 'static>(
     let pipe_path_clone = pipe_path.clone();
 
     let c_path = std::ffi::CString::new(
-        pipe_path
-            .to_str()
-            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
-    )
-    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+        pipe_path.to_str().ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    ).map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
 
     unsafe {
         if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
@@ -662,20 +555,18 @@ pub fn serialize_ivf_pq<W: Write + Send + 'static>(
     });
 
     let result = index.serialize(res, &pipe_path);
-    let reader_result = reader_thread
-        .join()
+    let reader_result = reader_thread.join()
         .map_err(|_| crate::error::Error::new("Reader thread panicked"))?;
 
     let _ = fs::remove_file(&pipe_path);
-
     result?;
     reader_result?;
     Ok(())
 }
 
 #[cfg(not(unix))]
-pub fn serialize_ivf_pq<W: Write>(
-    res: &crate::resources::Resources,
+fn serialize_ivf_pq<W: Write>(
+    res: &Resources,
     index: &crate::ivf_pq::Index,
     mut writer: W,
 ) -> Result<()> {
@@ -694,15 +585,9 @@ pub fn serialize_ivf_pq<W: Write>(
     Ok(())
 }
 
-/// Deserialize an IVF-PQ index from a reader without buffering the entire index in memory
-///
-/// # Arguments
-///
-/// * `res` - CUDA resources handle
-/// * `reader` - Source reader (file, network socket, decompression stream, etc.)
 #[cfg(unix)]
-pub fn deserialize_ivf_pq<R: Read + Send + 'static>(
-    res: &crate::resources::Resources,
+fn deserialize_ivf_pq<R: Read + Send + 'static>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::ivf_pq::Index> {
     use std::fs;
@@ -712,11 +597,8 @@ pub fn deserialize_ivf_pq<R: Read + Send + 'static>(
     let pipe_path_clone = pipe_path.clone();
 
     let c_path = std::ffi::CString::new(
-        pipe_path
-            .to_str()
-            .ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
-    )
-    .map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
+        pipe_path.to_str().ok_or_else(|| crate::error::Error::new("Invalid pipe path"))?,
+    ).map_err(|_| crate::error::Error::new("Pipe path contains null bytes"))?;
 
     unsafe {
         if libc::mkfifo(c_path.as_ptr(), 0o600) != 0 {
@@ -735,19 +617,17 @@ pub fn deserialize_ivf_pq<R: Read + Send + 'static>(
     });
 
     let result = crate::ivf_pq::Index::deserialize(res, &pipe_path);
-    let writer_result = writer_thread
-        .join()
+    let writer_result = writer_thread.join()
         .map_err(|_| crate::error::Error::new("Writer thread panicked"))?;
 
     let _ = fs::remove_file(&pipe_path);
-
     writer_result?;
     result
 }
 
 #[cfg(not(unix))]
-pub fn deserialize_ivf_pq<R: Read>(
-    res: &crate::resources::Resources,
+fn deserialize_ivf_pq<R: Read>(
+    res: &Resources,
     mut reader: R,
 ) -> Result<crate::ivf_pq::Index> {
     use std::fs;
@@ -781,11 +661,11 @@ impl StreamSerialize for crate::cagra::Index {
         writer: W,
         include_dataset: bool,
     ) -> Result<()> {
-        serialize(res, self, writer, include_dataset)
+        serialize_cagra(res, self, writer, include_dataset)
     }
 
     fn stream_deserialize<R: Read + Send + 'static>(res: &Resources, reader: R) -> Result<Self> {
-        deserialize(res, reader)
+        deserialize_cagra(res, reader)
     }
 }
 
